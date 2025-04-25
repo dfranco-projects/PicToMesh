@@ -104,5 +104,5 @@ This project was built to blend AI, vision, and practical dev skills into someth
 
 If you want to chat, collab, hire, or just geek out about computer vision and 3D stuff—reach out!
 
-📫 [daniel.franco.inbox@gmail.com](mailto:daniel.franco.inbox@gmail.com)  
+📫 [Mail](mailto:daniel.franco.inbox@gmail.com)  
 💼 [LinkedIn](https://www.linkedin.com/in/daniel-abrantes-franco/)
