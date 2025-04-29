@@ -60,7 +60,7 @@ PicToMesh/
 │   ├── point_cloud_gen.ipynb       # Point cloud experiments with Open3D
 │   └── mesh_refinement.ipynb       # PyTorch super-resolution (future)
 │
-├── test_images/                    # Images to test
+├── test_images/                    # Images for testing
 │
 ├── docker-compose.yml              # Runs frontend + backend together
 ├── .gitignore                      # Ignores common files, Python, Node, etc.
