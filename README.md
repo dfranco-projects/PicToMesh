@@ -44,20 +44,29 @@
 
 ```bash
 PicToMesh/
-├── backend/                # FastAPI app: ORB matcher, point cloud, mesh gen
-│   ├── api/                # API routes and controllers
-│   ├── core/               # ORB matching, Open3D processing logic
-│   ├── models/             # (future) PyTorch super-resolution modules
-│   └── main.py             # FastAPI entry point
+├── backend/                        # FastAPI app: ORB matcher, point cloud, mesh gen
+│   ├── api/                        # API routes and controllers
+│   ├── core/                       # ORB matching, Open3D processing logic
+│   ├── models/                     # (future) PyTorch super-resolution modules
+│   └── main.py                     # FastAPI entry point
 │
-├── frontend/               # React + Vite + Three.js UI
-│   ├── components/         # Drag-n-drop, viewer, controls
-│   ├── pages/              # Main layout and routes
-│   └── main.jsx            # Frontend entry point
+├── frontend/                       # React + Vite + Three.js UI
+│   ├── components/                 # Drag-n-drop, viewer, controls
+│   ├── pages/                      # Main layout and routes
+│   └── main.jsx                    # Frontend entry point
 │
-├── docker-compose.yml      # Runs frontend + backend together
-├── .gitignore              # Ignores common files, Python, Node, etc.
-├── README.md               # You're here :)
+├── notebooks/                      # Notebooks for testing
+│   ├── orb_filtering.ipynb         # ORB image matching tests
+│   ├── point_cloud_gen.ipynb       # Point cloud experiments with Open3D
+│   └── mesh_refinement.ipynb       # PyTorch super-resolution (future)
+│
+├── test_images/                    # Images to test
+│
+├── docker-compose.yml              # Runs frontend + backend together
+├── .gitignore                      # Ignores common files, Python, Node, etc.
+├── requirements.txt                # Backend Python deps (manually or pip freeze)
+├── frontend/package.json           # Auto-generated when you init Vite frontend
+├── README.md                       # You're here :)
 ```
 
 ---
