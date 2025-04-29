@@ -32,10 +32,33 @@
 | Frontend     | React, Three.js, Vite                        |
 | Backend      | FastAPI, OpenCV, Open3D                      |
 | 3D Viewer    | Three.js + OrbitControls                     |
+| ML/Refinement| PyTorch (for future super-resolution)        |
 | Container    | Docker, Docker Compose                       |
 | Infra as Code| Terraform (optional, but infra-ready)        |
 | CI/CD        | GitHub Actions (with linting, formatting)    |
 | Styling      | PEP8 with `flake8`, `black`, and `isort`     |
+
+---
+
+## 📁 Project Structure
+
+```bash
+PicToMesh/
+├── backend/                # FastAPI app: ORB matcher, point cloud, mesh gen
+│   ├── api/                # API routes and controllers
+│   ├── core/               # ORB matching, Open3D processing logic
+│   ├── models/             # (future) PyTorch super-resolution modules
+│   └── main.py             # FastAPI entry point
+│
+├── frontend/               # React + Vite + Three.js UI
+│   ├── components/         # Drag-n-drop, viewer, controls
+│   ├── pages/              # Main layout and routes
+│   └── main.jsx            # Frontend entry point
+│
+├── docker-compose.yml      # Runs frontend + backend together
+├── .gitignore              # Ignores common files, Python, Node, etc.
+├── README.md               # You're here :)
+```
 
 ---
 
@@ -80,6 +103,7 @@ If the mesh isn’t quite right, no problem—you can select a different reconst
 - [ ] Fully containerized deployment using Docker
 - [ ] Infrastructure setup using Terraform (Fly.io / Render)
 - [ ] Add automated CI/CD pipeline with GitHub Actions
+- [ ] Add PyTorch-based mesh refinement (super-resolution or denoising)
 - [ ] Write a blog post explaining the full pipeline and tech choices
 
 ---
