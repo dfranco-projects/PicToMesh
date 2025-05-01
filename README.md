@@ -47,18 +47,23 @@ PicToMesh/
 ├── backend/                        # FastAPI app: ORB matcher, point cloud, mesh gen
 │   ├── api/                        # API routes and controllers
 │   ├── core/                       # ORB matching, Open3D processing logic
-│   ├── models/                     # (future) PyTorch super-resolution modules
-│   └── main.py                     # FastAPI entry point
+│   ├── models/                     # PyTorch super-resolution modules
+│   └── main.py                     # FastAPI entry
 │
 ├── frontend/                       # React + Vite + Three.js UI
 │   ├── components/                 # Drag-n-drop, viewer, controls
 │   ├── pages/                      # Main layout and routes
 │   └── main.jsx                    # Frontend entry point
 │
-├── notebooks/                      # Notebooks for testing
-│   ├── orb_filtering.ipynb         # ORB image matching tests
-│   ├── point_cloud_gen.ipynb       # Point cloud experiments with Open3D
-│   └── mesh_refinement.ipynb       # PyTorch super-resolution (future)
+├── demos/                          # Jupyter notebooks to explain core processes visually
+│   ├── orb_matcher.ipynb           # Interactive, beginner-friendly ORB guide
+│   ├── point_cloud_gen.ipynb       # Open3D and PCD explanations
+│   └── mesh_refinement.ipynb       # (Planned) Super-resolution experiments
+│
+├── tests/                          # Automated testing with pytest
+│   ├── test_orb_matcher.py         # Unit tests for ORB logic
+│   ├── test_point_cloud.py         # Tests for Open3D pipelines
+│   └── conftest.py                 # Fixtures and test setup
 │
 ├── test_images/                    # Images for testing
 │
@@ -66,7 +71,7 @@ PicToMesh/
 ├── .gitignore                      # Ignores common files, Python, Node, etc.
 ├── requirements.txt                # Backend Python deps (manually or pip freeze)
 ├── frontend/package.json           # Auto-generated when you init Vite frontend
-├── README.md                       # You're here :)
+├── README.md                       # You're here :)                
 ```
 
 ---
