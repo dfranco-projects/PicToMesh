@@ -56,9 +56,9 @@ PicToMesh/
 │   └── main.jsx                    # Frontend entry point
 │
 ├── demos/                          # Jupyter notebooks to explain core processes visually
-│   ├── orb_matcher.ipynb           # Interactive, beginner-friendly ORB guide
-│   ├── point_cloud_gen.ipynb       # Open3D and PCD explanations
-│   └── mesh_refinement.ipynb       # (Planned) Super-resolution experiments
+│   ├── orb_demo.ipynb              # Interactive, beginner-friendly ORB guide
+│   ├── point_cloud_gen_demo.ipynb  # Open3D and PCD explanations
+│   └── mesh_refinement_demo.ipynb  # (Planned) Super-resolution experiments
 │
 ├── tests/                          # Automated testing with pytest
 │   ├── test_orb_matcher.py         # Unit tests for ORB logic
