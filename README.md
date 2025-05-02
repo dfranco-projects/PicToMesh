@@ -1,4 +1,4 @@
-# 📷 PicToMesh – Open-Source 3D Meshes From Your Images
+# 📸 PicToMesh – Open-Source 3D Meshes From Your Images
 
 **PicToMesh** is a full-stack, open-source tool that lets you drag-and-drop images and receive a downloadable 3D mesh of the object — all in the browser, with no signups, no API keys, and no black-box models. Built for hackers, researchers, and hobbyists who want to own their pipeline.
 
