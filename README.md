@@ -60,22 +60,54 @@ Creating 3D meshes from images is traditionally a task locked behind expensive s
 
 ```bash
 PicToMesh/
-├── backend/                    # Django app: filtering, 3D processing, mesh export
-│   ├── clustering/             # CLIP-based similarity + Louvain clustering
-│   ├── reconstruction/         # Point cloud and mesh generation
-│   ├── views.py                # Upload endpoints and processing logic
-│   └── models/                 # (Optional future ML support)
+├── apps/                           # Domain-driven modules (can be split further)
+│   ├── mesh_generator/             # Mesh creation logic (Open3D, triangulation, etc.)
+│   ├── point_cloud/                # Point cloud generation algorithms
+│   ├── filtering/                  # CLIP filtering, clustering, and preprocessing
+│   └── uploader/                   # File handling, validation, drag-and-drop logic
 │
-├── frontend/                   # React + Vite + Three.js interface
-│   ├── components/             # Drag-and-drop UI, mesh viewer
-│   ├── pages/                  # Routes and main layout
-│   └── main.jsx                # Frontend entry point
+├── backend/                        # Django app: filtering, 3D processing, mesh export
+│   ├── api/                        # Routes / views / serializers
+│   ├── settings/                   # Django settings (base, dev, prod, etc.)
+│   ├── urls.py                     # API routing entry point
+│   └── wsgi.py / asgi.py           # Server entry point
 │
-├── docker/                     # Dockerfiles and container configs
+├── cli/                            # CLI tools for local preprocessing or batch jobs
+│   └── preprocess.py               # Image cleaner, downsampler, test image prep
 │
-├── static/                     # Test images and sample meshes
-├── tests/                      # Unit tests for core image + mesh logic
-├── README.md                   # This file :)
+├── frontend/                       # React (Vite) frontend
+│   ├── components/                 # Mesh viewer, upload UI, control panels
+│   ├── pages/                      # Upload page, results viewer
+│   ├── utils/                      # File drag-drop hooks, mesh render logic
+│   └── main.jsx                    # Frontend entry point
+│
+├── scripts/                        # One-off scripts for setup, init, or testing
+│   └── generate_mesh_from_folder.py
+│
+├── media/                          # Uploaded files (served locally or via nginx)
+│   └── meshes/                     # Generated meshes to preview / download
+│
+├── static/                         # JS, CSS, favicon, etc. (served by Django or nginx)
+│
+├── tests/                          # Unit + integration tests
+│   ├── test_filtering.py
+│   ├── test_mesh_generator.py
+│   └── conftest.py
+│
+├── docs/                           # Architecture diagrams, contribution guides, etc.
+│   └── architecture.md
+│
+├── docker/                         # Docker-related files for services
+│   ├── backend.dockerfile
+│   ├── frontend.dockerfile
+│   └── nginx/                      # Static file serving and reverse proxy config
+│       └── default.conf
+│
+├── docker-compose.yml              # Compose setup for full stack
+├── manage.py                       # Django management entry point
+├── requirements.txt                # Python dependencies
+├── frontend/package.json           # Frontend dependencies
+└── README.md                       # This file :)
 ```
 
 ---
