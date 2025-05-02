@@ -85,7 +85,11 @@ PicToMesh/
 │   └── generate_mesh_from_folder.py
 │
 ├── media/                          # Uploaded files (served locally or via nginx)
+│   ├── input/                      # User-uploaded images go here
 │   └── meshes/                     # Generated meshes to preview / download
+│
+├── output/                         # Output folder for generated results (e.g., meshes, processed data)
+│   └── results/                    # Store processed results, e.g., generated meshes
 │
 ├── static/                         # JS, CSS, favicon, etc. (served by Django or nginx)
 │
