@@ -60,17 +60,27 @@ Creating 3D meshes from images is traditionally a task locked behind expensive s
 
 ```bash
 PicToMesh/
-├── apps/                           # Domain-driven modules (can be split further)
+├── apps/                           # Domain-driven modules
+│   ├── filtering/                  # CLIP filtering + Louvain community clustering
+│   │   ├── clip_encoder.py         # CLIP image embedding logic
+│   │   ├── graph_builder.py        # Builds similarity graph from embeddings
+│   │   ├── image_community.py      # Louvain clustering + outlier detection
+│   │   └── pipeline.py             # High-level function that runs the filtering process
+│   │
+│   ├── image_io/                   # Handles image reading, preloading, basic processing
+│   │   └── img_manager.py          # Class to manage image loading and metadata
+│   │
 │   ├── mesh_generator/             # Mesh creation logic (Open3D, triangulation, etc.)
-│   ├── point_cloud/                # Point cloud generation algorithms
-│   ├── filtering/                  # CLIP filtering, clustering, and preprocessing
+│   │
+│   └── point_cloud/                # Point cloud generation algorithms
+│
 │   └── uploader/                   # File handling, validation, drag-and-drop logic
 │
-├── backend/                        # Django app: filtering, 3D processing, mesh export
+├── backend/                        # Django backend app
 │   ├── api/                        # Routes / views / serializers
 │   ├── settings/                   # Django settings (base, dev, prod, etc.)
 │   ├── urls.py                     # API routing entry point
-│   └── wsgi.py / asgi.py           # Server entry point
+│   └── wsgi.py / asgi.py           # Server entry points
 │
 ├── cli/                            # CLI tools for local preprocessing or batch jobs
 │   └── preprocess.py               # Image cleaner, downsampler, test image prep
@@ -81,37 +91,40 @@ PicToMesh/
 │   ├── utils/                      # File drag-drop hooks, mesh render logic
 │   └── main.jsx                    # Frontend entry point
 │
-├── scripts/                        # One-off scripts for setup, init, or testing
+├── scripts/                        # One-off scripts for setup or testing
 │   └── generate_mesh_from_folder.py
 │
-├── media/                          # Uploaded files (served locally or via nginx)
-│   ├── input/                      # User-uploaded images go here
-│   └── meshes/                     # Generated meshes to preview / download
+├── media/                          # User-uploaded files and generated assets
+│   ├── input/                      # Temporary uploaded images (user input)
+│   └── meshes/                     # Generated meshes for preview/download
 │
-├── output/                         # Output folder for generated results (e.g., meshes, processed data)
-│   └── results/                    # Store processed results, e.g., generated meshes
+├── output/                         # Output folder for generated data (intermediate or backend-only)
+│   └── results/                    # Processed results (e.g., mesh files)
 │
-├── static/                         # JS, CSS, favicon, etc. (served by Django or nginx)
+├── static/                         # Static assets served by Django/nginx
 │
 ├── tests/                          # Unit + integration tests
 │   ├── test_filtering.py
 │   ├── test_mesh_generator.py
-│   └── conftest.py
+│   ├── conftest.py
+│   └── assets/                     # Static test images for test use
+│       ├── test_image_01.jpg
+│       └── ...
 │
-├── docs/                           # Architecture diagrams, contribution guides, etc.
+├── docs/                           # Documentation and diagrams
 │   └── architecture.md
 │
-├── docker/                         # Docker-related files for services
+├── docker/                         # Docker-related files
 │   ├── backend.dockerfile
 │   ├── frontend.dockerfile
-│   └── nginx/                      # Static file serving and reverse proxy config
+│   └── nginx/                      # nginx config for static/reverse proxy
 │       └── default.conf
 │
-├── docker-compose.yml              # Compose setup for full stack
+├── docker-compose.yml              # Full stack Docker setup
 ├── manage.py                       # Django management entry point
 ├── requirements.txt                # Python dependencies
 ├── frontend/package.json           # Frontend dependencies
-└── README.md                       # This file :)
+└── README.md                       # Project overview
 ```
 
 ---
