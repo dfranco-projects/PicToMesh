@@ -34,25 +34,27 @@ Creating 3D meshes from images is traditionally a task locked behind expensive s
 
 | Scenario         | What Happens Under the Hood                             |
 |------------------|----------------------------------------------------------|
-| Single Image     | Skips filtering, runs 1-image mesh reconstruction flow  |
-| Multiple Images  | Uses **CLIP + cosine similarity + Louvain clustering** to group consistent images and discard outliers |
-| After Filtering  | Generates a point cloud via photogrammetry (OpenMVG/OpenMVS, or Open3D) |
-| Mesh Creation    | Converts point cloud to 3D mesh using Poisson or Ball Pivoting |
-| Mesh Interaction | Uses Three.js for an interactive in-browser experience  |
+| Single Image     | SAM2 background removal → **TripoSR** feed-forward mesh (no photogrammetry needed) |
+| Multiple Images  | SAM2 background removal → **MASt3R** neural SfM (no camera calibration needed) → Open3D Poisson mesh |
+| Depth Fallback   | **Depth Anything v2** monocular depth → point cloud lift (CPU-friendly path) |
+| Mesh Interaction | Three.js + OrbitControls for interactive in-browser viewing |
 
 ---
 
 ## 🧰 Tech Stack
 
-| Layer         | Tools Used                                                  |
-|---------------|-------------------------------------------------------------|
-| Frontend      | React, Vite, Three.js, Tailwind                             |
-| Backend       | Django, OpenCV, Open3D, NumPy, CLIP (open source, no API)   |
-| Mesh Viewer   | Three.js + OrbitControls                                    |
-| 3D Engine     | Open3D or custom Poisson / Ball Pivoting meshers           |
-| Container     | Docker, Docker Compose                                     |
-| Deployment    | Fly.io / Render (infra ready with no vendor lock-in)       |
-| Styling       | PEP8 with `black`, `flake8`, and `isort`                   |
+| Layer              | Tools Used                                                        |
+|--------------------|-------------------------------------------------------------------|
+| Frontend           | React, Vite, Three.js, Tailwind                                   |
+| Backend            | Django, OpenCV, Open3D, NumPy, PyTorch                            |
+| Single-image → 3D  | TripoSR (feed-forward transformer, no photogrammetry)             |
+| Multi-image → 3D   | MASt3R neural SfM + Open3D Poisson reconstruction                 |
+| Segmentation       | SAM2 (automatic background removal before reconstruction)         |
+| Depth fallback     | Depth Anything v2 (monocular depth, CPU-friendly)                 |
+| Mesh Viewer        | Three.js + OrbitControls                                          |
+| Container          | Docker, Docker Compose                                            |
+| Package manager    | uv                                                                |
+| Linting            | ruff                                                              |
 
 ---
 
@@ -60,71 +62,34 @@ Creating 3D meshes from images is traditionally a task locked behind expensive s
 
 ```bash
 PicToMesh/
-├── apps/                           # Domain-driven modules
-│   ├── filtering/                  # CLIP filtering + Louvain community clustering
-│   │   ├── clip_encoder.py         # CLIP image embedding logic
-│   │   ├── graph_builder.py        # Builds similarity graph from embeddings
-│   │   ├── image_community.py      # Louvain clustering + outlier detection
-│   │   └── pipeline.py             # High-level function that runs the filtering process
-│   │
-│   ├── image_io/                   # Handles image reading, preloading, basic processing
-│   │   └── img_manager.py          # Class to manage image loading and metadata
-│   │
-│   ├── mesh_generator/             # Mesh creation logic (Open3D, triangulation, etc.)
-│   │
-│   └── point_cloud/                # Point cloud generation algorithms
+├── src/pictomesh/              # Core Python package
+│   ├── image_io/               # Image loading and metadata (ImageManager)
+│   ├── filtering/              # CLIP embedding + Louvain outlier detection
+│   ├── segmentation/           # SAM2 background removal
+│   ├── reconstruction/         # MASt3R neural SfM + Depth Anything fallback
+│   ├── mesh/                   # TripoSR (single-image) + Open3D Poisson (multi-image)
+│   └── uploader/               # File validation and drag-and-drop handling
 │
-│   └── uploader/                   # File handling, validation, drag-and-drop logic
+├── backend/                    # Django API (routes, views, serializers, settings)
+├── frontend/                   # React/Vite (components, pages, Three.js viewer)
+├── cli/                        # CLI tools for local batch processing
+├── scripts/                    # One-off utility scripts
+├── demos/                      # Jupyter notebooks for experimenting
 │
-├── backend/                        # Django backend app
-│   ├── api/                        # Routes / views / serializers
-│   ├── settings/                   # Django settings (base, dev, prod, etc.)
-│   ├── urls.py                     # API routing entry point
-│   └── wsgi.py / asgi.py           # Server entry points
+├── media/                      # Runtime: uploaded images and generated meshes
+├── output/                     # Runtime: intermediate results
+├── static/                     # Static assets served by Django/nginx
 │
-├── cli/                            # CLI tools for local preprocessing or batch jobs
-│   └── preprocess.py               # Image cleaner, downsampler, test image prep
+├── tests/                      # Pytest tests
+│   └── assets/                 # All test images (chairs, cats)
 │
-├── frontend/                       # React (Vite) frontend
-│   ├── components/                 # Mesh viewer, upload UI, control panels
-│   ├── pages/                      # Upload page, results viewer
-│   ├── utils/                      # File drag-drop hooks, mesh render logic
-│   └── main.jsx                    # Frontend entry point
+├── docs/                       # Documentation and diagrams
+├── docker/                     # Dockerfiles + nginx config
+├── bin/                        # Dev scripts (install.sh)
 │
-├── scripts/                        # One-off scripts for setup or testing
-│   └── generate_mesh_from_folder.py
-│
-├── media/                          # User-uploaded files and generated assets
-│   ├── input/                      # Temporary uploaded images (user input)
-│   └── meshes/                     # Generated meshes for preview/download
-│
-├── output/                         # Output folder for generated data (intermediate or backend-only)
-│   └── results/                    # Processed results (e.g., mesh files)
-│
-├── static/                         # Static assets served by Django/nginx
-│
-├── tests/                          # Unit + integration tests
-│   ├── test_filtering.py
-│   ├── test_mesh_generator.py
-│   ├── conftest.py
-│   └── assets/                     # Static test images for test use
-│       ├── test_image_01.jpg
-│       └── ...
-│
-├── docs/                           # Documentation and diagrams
-│   └── architecture.md
-│
-├── docker/                         # Docker-related files
-│   ├── backend.dockerfile
-│   ├── frontend.dockerfile
-│   └── nginx/                      # nginx config for static/reverse proxy
-│       └── default.conf
-│
-├── docker-compose.yml              # Full stack Docker setup
-├── manage.py                       # Django management entry point
-├── requirements.txt                # Python dependencies
-├── frontend/package.json           # Frontend dependencies
-└── README.md                       # Project overview
+├── pyproject.toml              # Dependencies and tool config (uv)
+├── Makefile                    # Dev commands
+└── README.md
 ```
 
 ---
