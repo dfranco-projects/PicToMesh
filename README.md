@@ -1,152 +1,172 @@
-# 📸 PicToMesh – Open-Source 3D Meshes From Your Images
+# PicToMesh – Open-Source 3D Meshes From Your Images
 
-**PicToMesh** is a full-stack, open-source tool that lets you drag-and-drop images and receive a downloadable 3D mesh of the object — all in the browser, with no signups, no API keys, and no black-box models. Built for hackers, researchers, and hobbyists who want to own their pipeline.
-
----
-
-## 🎯 Utilities & Why It Exists
-
-Creating 3D meshes from images is traditionally a task locked behind expensive software or complex pipelines. **PicToMesh** aims to break that barrier by offering a fully open-source, easy-to-use tool for:
-
-- ✅ **Hobbyists & Makers:** Turn your DIY projects or handmade objects into printable 3D files.
-- 🏫 **Educators & Students:** Learn photogrammetry, 3D reconstruction, and computer vision with a visual, hackable tool.
-- 📦 **Developers & Researchers:** Extend it as a base for experiments in image processing, scene understanding, or shape analysis.
-- 🖼️ **Designers & Artists:** Convert real-world imagery into interactive meshes for use in 3D scenes or assets.
-- 🔍 **Open Science Advocates:** Transparent algorithms, no vendor lock-in, and reproducible outputs — perfect for academic use.
+**PicToMesh** is a full-stack, open-source tool that lets you drag-and-drop images and receive a downloadable 3D mesh of the object — all in the browser, with no signups, no API keys, and no black-box models.
 
 ---
 
-## 🚀 What It Does
+## What It Does
 
-- 🖼️ **Drag and drop** one or many images of an object
-- 🧠 Uses **CLIP embeddings** to auto-cluster and filter mismatched or outlier images (if multi-image)
-- 🔎 Applies **point cloud reconstruction** from images using open-source algorithms
-- 🧱 Generates a **3D mesh** based on input image count (different algo for 1 vs many)
-- 🌀 View your 3D model interactively (rotate, zoom, pan) in-browser
-- 💾 **Download** the final mesh (STL, OBJ, or GLB)
-- 🔁 Supports algorithm switching and re-generation
-- 🔓 Fully open-source — no API keys, no paywalls, just local compute
-- 💡 Designed to be readable, hackable, and educational
-
----
-
-## 🧠 How It Works
-
-| Scenario         | What Happens Under the Hood                             |
-|------------------|----------------------------------------------------------|
-| Single Image     | SAM2 background removal → **TripoSR** feed-forward mesh (no photogrammetry needed) |
-| Multiple Images  | SAM2 background removal → **MASt3R** neural SfM (no camera calibration needed) → Open3D Poisson mesh |
-| Depth Fallback   | **Depth Anything v2** monocular depth → point cloud lift (CPU-friendly path) |
-| Mesh Interaction | Three.js + OrbitControls for interactive in-browser viewing |
+- Drag and drop one or many images of an object
+- Automatic background removal before reconstruction
+- Feed-forward mesh generation from a single image (no photogrammetry)
+- Neural multi-view reconstruction from many images (no camera calibration)
+- Interactive 3D viewer in-browser (rotate, zoom, pan)
+- Download the mesh in GLB, OBJ, or STL
+- Real-time progress updates during reconstruction
+- Fully open-source — no API keys, no paywalls, just local compute
 
 ---
 
-## 🧰 Tech Stack
+## How It Works
 
-| Layer              | Tools Used                                                        |
-|--------------------|-------------------------------------------------------------------|
-| Frontend           | React, Vite, Three.js, Tailwind                                   |
-| Backend            | Django, OpenCV, Open3D, NumPy, PyTorch                            |
-| Single-image → 3D  | TripoSR (feed-forward transformer, no photogrammetry)             |
-| Multi-image → 3D   | MASt3R neural SfM + Open3D Poisson reconstruction                 |
-| Segmentation       | SAM2 (automatic background removal before reconstruction)         |
-| Depth fallback     | Depth Anything v2 (monocular depth, CPU-friendly)                 |
-| Mesh Viewer        | Three.js + OrbitControls                                          |
-| Container          | Docker, Docker Compose                                            |
-| Package manager    | uv                                                                |
-| Linting            | ruff                                                              |
+| Scenario        | Pipeline                                                                           |
+|-----------------|------------------------------------------------------------------------------------|
+| Single image    | SAM2 background removal → **TripoSR** feed-forward mesh (~5s on GPU)              |
+| 2–4 images      | SAM2 → TripoSR with multi-view hint                                                |
+| 5+ images       | SAM2 → **MASt3R** neural SfM (no calibration) → Open3D Poisson mesh              |
+| CPU / no GPU    | SAM2 → **Depth Anything v2** monocular depth → point cloud lift                   |
+
+Jobs are processed asynchronously — the browser streams real-time progress via SSE.
 
 ---
 
-## 📁 Project Structure
+## Tech Stack
 
-```bash
-PicToMesh/
-├── src/pictomesh/              # Core Python package
-│   ├── image_io/               # Image loading and metadata (ImageManager)
-│   ├── filtering/              # CLIP embedding + Louvain outlier detection
-│   ├── segmentation/           # SAM2 background removal
-│   ├── reconstruction/         # MASt3R neural SfM + Depth Anything fallback
-│   ├── mesh/                   # TripoSR (single-image) + Open3D Poisson (multi-image)
-│   └── uploader/               # File validation and drag-and-drop handling
-│
-├── backend/                    # Django API (routes, views, serializers, settings)
-├── frontend/                   # React/Vite (components, pages, Three.js viewer)
-├── cli/                        # CLI tools for local batch processing
-├── scripts/                    # One-off utility scripts
-├── demos/                      # Jupyter notebooks for experimenting
-│
-├── media/                      # Runtime: uploaded images and generated meshes
-├── output/                     # Runtime: intermediate results
-├── static/                     # Static assets served by Django/nginx
-│
-├── tests/                      # Pytest tests
-│   └── assets/                 # All test images (chairs, cats)
-│
-├── docs/                       # Documentation and diagrams
-├── docker/                     # Dockerfiles + nginx config
-├── bin/                        # Dev scripts (install.sh)
-│
-├── pyproject.toml              # Dependencies and tool config (uv)
-├── Makefile                    # Dev commands
-└── README.md
+**Backend**
+
+| Layer          | Choice                        | Why                                                    |
+|----------------|-------------------------------|--------------------------------------------------------|
+| API framework  | FastAPI + uvicorn             | Async-native, lightweight, excellent for ML APIs       |
+| Job queue      | ARQ + Redis                   | Async Redis queue; pairs naturally with FastAPI        |
+| Progress       | SSE (Server-Sent Events)      | Simple one-way streaming, no WebSocket overhead        |
+| ML runtime     | PyTorch (MPS / CUDA / CPU)    | Auto-detects best device                               |
+| 3D engine      | Open3D + trimesh              | Point cloud processing and mesh I/O                   |
+| Segmentation   | SAM2                          | State-of-the-art open-source segmentation              |
+| Single-image   | TripoSR                       | Feed-forward image→mesh transformer, ~5s on GPU       |
+| Multi-image    | MASt3R                        | Neural SfM, no camera calibration required             |
+| Depth fallback | Depth Anything v2             | Monocular depth, runs on CPU                           |
+
+**Frontend**
+
+| Layer          | Choice                        | Why                                                    |
+|----------------|-------------------------------|--------------------------------------------------------|
+| Framework      | React 19 + Vite 6             | Fast builds, great DX                                  |
+| 3D viewer      | React Three Fiber + drei      | Declarative Three.js for React                         |
+| UI components  | shadcn/ui + Tailwind v4       | Radix primitives, accessible, code lives in your repo  |
+| Server state   | TanStack Query v5             | Job polling, caching, SSE integration                  |
+| Client state   | Zustand                       | Lightweight, no boilerplate                            |
+| File upload    | react-dropzone                | Drag-and-drop with validation                          |
+
+**Infrastructure**
+
+| Layer          | Choice                        |
+|----------------|-------------------------------|
+| Container      | Docker + Docker Compose       |
+| Reverse proxy  | nginx                         |
+| Queue backend  | Redis 7                       |
+| Package mgr    | uv                            |
+| Linting        | ruff                          |
+
+---
+
+## Architecture
+
+```
+Browser (React + R3F + shadcn/ui)
+  │  HTTP + SSE
+  ▼
+FastAPI  ──────────────────────────────────────────────
+  ├── POST /jobs          enqueue reconstruction job
+  ├── GET  /jobs/{id}     poll status + result URL
+  ├── GET  /jobs/{id}/stream   SSE progress stream
+  └── GET  /meshes/{id}  download GLB/OBJ/STL
+  │
+  └──► ARQ worker (Redis queue)
+         ├── SAM2 segmentation
+         ├── TripoSR   (1–4 images)
+         └── MASt3R + Poisson  (5+ images)
 ```
 
 ---
 
-## 🖼️ Live Demo
+## Project Structure
 
-Coming soon – GIF and link to deployed version (no login required).
+```
+PicToMesh/
+├── src/pictomesh/          # Core ML package
+│   ├── image_io/           # Image loading (ImageManager)
+│   ├── filtering/          # CLIP embedding + outlier detection
+│   ├── segmentation/       # SAM2 background removal
+│   ├── reconstruction/     # MASt3R + Depth Anything fallback
+│   └── mesh/               # TripoSR + Open3D Poisson
+│
+├── backend/                # FastAPI app + ARQ worker
+│   ├── api/                # Routes (jobs, meshes)
+│   ├── worker/             # ARQ task definitions
+│   └── models.py           # Pydantic / SQLModel schemas
+│
+├── frontend/               # React/Vite app
+│   ├── src/
+│   │   ├── components/     # Viewer3D (R3F), Dropzone, JobStatus
+│   │   ├── pages/          # Home, Results
+│   │   ├── lib/            # TanStack Query hooks, API client
+│   │   └── store/          # Zustand store
+│   └── package.json
+│
+├── docker/                 # Dockerfiles + nginx config
+├── demos/                  # Jupyter notebooks
+├── tests/
+│   └── assets/             # Test images (chairs, cats)
+├── docs/
+├── bin/
+├── pyproject.toml
+├── Makefile
+└── docker-compose.yml
+```
 
 ---
 
-## 🛠️ Run Locally
+## Run Locally
 
 ```bash
-# clone the repo
 git clone https://github.com/dfranco-projects/PicToMesh.git
 cd PicToMesh
-
-# spin up the app
 docker-compose up --build
-
 ```
----
 
-## 🧪 Roadmap
-
-- [x] Upload and drag-and-drop interface
-- [x] CLIP-based image similarity + Louvain clustering
-- [x] Point cloud generation (Open3D)
-- [x] Mesh creation (single vs multi-image support)
-- [x] 3D viewer with orbit, zoom, and lighting
-- [x] Mesh file download (.OBJ or .STL)
-- [ ] Retry / Re-select processing pipeline
-- [ ] Algorithm selection dropdown (Poisson, Ball Pivoting, etc.)
-- [ ] GLB format export (web-optimized)
-- [ ] Light/dark theme toggle for frontend
-- [ ] Mesh denoising or refinement with open-source tools
-- [ ] Replace all remaining proprietary dependencies (if any)
-- [ ] Add image preprocessing options (resize, background removal)
-- [ ] CLI support for local batch processing
+Open `http://localhost:3000`. The API is at `http://localhost:8000`.
 
 ---
 
-## 🤝 Contributing
+## Roadmap
 
-Contributions are welcome! Whether you’re improving performance, fixing bugs, adding features, or refactoring code — just open a PR or an issue.
-
-If you're unsure where to start, check out the `issues` tab for ideas, or reach out!
+- [ ] FastAPI backend with ARQ job queue
+- [ ] SAM2 segmentation pipeline
+- [ ] TripoSR single-image path
+- [ ] MASt3R multi-image path
+- [ ] Depth Anything v2 CPU fallback
+- [ ] React frontend with shadcn/ui
+- [ ] React Three Fiber mesh viewer
+- [ ] SSE real-time progress
+- [ ] GLB / OBJ / STL download
+- [ ] Docker Compose full-stack setup
+- [ ] CLI for local batch processing
 
 ---
 
-## 📜 License
+## Contributing
+
+Contributions are welcome. Open a PR or an issue — whether it's a bug fix, new feature, or refactor.
+
+---
+
+## License
 
 **MIT License** – Free to use, modify, and redistribute with credit.
 
 ---
 
-## 💬 Connect
+## Connect
 
-- 📫 [daniel.franco.inbox@gmail.com](mailto:daniel.franco.inbox@gmail.com)  
-- 💼 [LinkedIn](https://www.linkedin.com/in/daniel-abrantes-franco/)
+- [daniel.franco.inbox@gmail.com](mailto:daniel.franco.inbox@gmail.com)
+- [LinkedIn](https://www.linkedin.com/in/daniel-abrantes-franco/)
