@@ -35,6 +35,7 @@ segmentation = [
 dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-forked>=1.6.0",
     "ruff>=0.15.11",
 ]
 
