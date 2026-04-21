@@ -64,3 +64,4 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = ["slow: marks tests that use real ML services (deselect with -m 'not slow')"]

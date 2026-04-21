@@ -38,7 +38,19 @@ class CameraIntrinsics:
         )
 
 
-# ── Protocol for multi-view reconstruction ────────────────────────────────────
+# ── Protocols ─────────────────────────────────────────────────────────────────
+
+
+class DepthEstimator(Protocol):
+    """Implemented by Depth Anything v2 or any monocular depth backend."""
+
+    def estimate(self, image: np.ndarray) -> np.ndarray:
+        """Return an H×W float32 depth map in metres.
+
+        Args:
+            image: H×W×3 BGR uint8 image.
+        """
+        ...
 
 
 class MultiViewReconstructor(Protocol):
@@ -47,6 +59,20 @@ class MultiViewReconstructor(Protocol):
     def reconstruct(self, images: list[np.ndarray]) -> o3d.geometry.PointCloud:
         """Return a dense point cloud from a set of unposed RGB images."""
         ...
+
+
+# ── Concrete depth estimators ─────────────────────────────────────────────────
+
+
+class FlatDepthEstimator:
+    """Returns a constant depth plane — useful for testing and CPU fallback."""
+
+    def __init__(self, depth: float = 1.0) -> None:
+        self._depth = depth
+
+    def estimate(self, image: np.ndarray) -> np.ndarray:
+        h, w = image.shape[:2]
+        return np.full((h, w), self._depth, dtype=np.float32)
 
 
 # ── Service ───────────────────────────────────────────────────────────────────

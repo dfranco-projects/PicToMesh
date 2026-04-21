@@ -73,6 +73,12 @@ class MeshService:
 
     def _compute_radii(self, pcd: o3d.geometry.PointCloud) -> list[float]:
         dists = np.asarray(pcd.compute_nearest_neighbor_distance())
+        dists = dists[dists > 0]   # exclude duplicates (distance == 0)
+        if len(dists) == 0:
+            raise ValueError(
+                "Cannot compute BPA radii: all points are duplicates. "
+                "Ensure the point cloud has unique positions."
+            )
         r = float(np.mean(dists))
         return [r, r * 2, r * 4, r * 8]
 
