@@ -1,4 +1,4 @@
-.PHONY: install uninstall lint format test build clean
+.PHONY: install uninstall lint format test test-fast dev up down
 .DEFAULT_GOAL := install
 
 # ── Environment ──────────────────────────────────────────────────────────────
@@ -36,3 +36,11 @@ test:
 
 test-fast:
 	uv run pytest tests/ -v -x --no-header -q
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+
+up:
+	docker compose up --build
+
+down:
+	docker compose down
