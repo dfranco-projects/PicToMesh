@@ -179,3 +179,9 @@ node_modules/
 # Misc
 .DS_Store
 *.log
+
+# CLAUDE
+CLAUDE.md
+
+# PYTHON
+.python-version
