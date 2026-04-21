@@ -6,6 +6,7 @@ services:
       - redis_data:/data
 
   api:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: docker/backend.dockerfile
@@ -22,6 +23,7 @@ services:
     restart: unless-stopped
 
   worker:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: docker/backend.dockerfile
