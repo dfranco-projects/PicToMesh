@@ -4,6 +4,8 @@ import pytest
 
 from pictomesh.reconstruction.service import (
     CameraIntrinsics,
+    DepthAnythingEstimator,
+    FlatDepthEstimator,
     ReconstructionService,
 )
 
@@ -180,3 +182,54 @@ class TestFromImages:
     def test_raises_with_empty_list(self, service, mock_reconstructor):
         with pytest.raises(ValueError):
             service.from_images([], mock_reconstructor)
+
+
+# ── FlatDepthEstimator ────────────────────────────────────────────────────────
+
+
+class TestFlatDepthEstimator:
+    def test_shape_matches_image(self):
+        est = FlatDepthEstimator()
+        depth = est.estimate(np.zeros((48, 64, 3), dtype=np.uint8))
+        assert depth.shape == (48, 64)
+
+    def test_dtype_is_float32(self):
+        est = FlatDepthEstimator()
+        depth = est.estimate(np.zeros((32, 32, 3), dtype=np.uint8))
+        assert depth.dtype == np.float32
+
+    def test_constant_value(self):
+        est = FlatDepthEstimator(depth=2.5)
+        depth = est.estimate(np.zeros((32, 32, 3), dtype=np.uint8))
+        assert np.all(depth == pytest.approx(2.5))
+
+
+# ── DepthAnythingEstimator ────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def depth_anything_estimator():
+    pytest.importorskip("transformers")
+    return DepthAnythingEstimator()
+
+
+class TestDepthAnythingEstimator:
+    @pytest.mark.slow
+    def test_output_shape_matches_input(self, depth_anything_estimator):
+        image = np.zeros((128, 96, 3), dtype=np.uint8)
+        depth = depth_anything_estimator.estimate(image)
+        assert depth.shape == (128, 96)
+
+    @pytest.mark.slow
+    def test_dtype_is_float32(self, depth_anything_estimator):
+        image = np.zeros((64, 64, 3), dtype=np.uint8)
+        depth = depth_anything_estimator.estimate(image)
+        assert depth.dtype == np.float32
+
+    @pytest.mark.slow
+    def test_depth_in_metre_range(self, depth_anything_estimator):
+        rng = np.random.default_rng(0)
+        image = rng.integers(0, 255, (64, 64, 3), dtype=np.uint8)
+        depth = depth_anything_estimator.estimate(image)
+        assert depth.min() >= 0.49
+        assert depth.max() <= 5.01
