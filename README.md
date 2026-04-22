@@ -107,10 +107,9 @@ PicToMesh/
 │
 ├── frontend/               # React/Vite app
 │   ├── src/
-│   │   ├── components/     # Viewer3D (R3F), Dropzone, JobStatus
-│   │   ├── pages/          # Home, Results
-│   │   ├── lib/            # TanStack Query hooks, API client
-│   │   └── store/          # Zustand store
+│   │   ├── components/     # Viewer3D (R3F), Dropzone, JobStatus, shadcn/ui
+│   │   ├── lib/            # API client (submitJob, fetchJob)
+│   │   └── store/          # Zustand store (jobId, meshUrl)
 │   └── package.json
 │
 ├── docker/                 # Dockerfiles + nginx config
@@ -140,17 +139,20 @@ Open `http://localhost:3000`. The API is at `http://localhost:8000`.
 
 ## Roadmap
 
-- [ ] FastAPI backend with ARQ job queue
-- [ ] SAM2 segmentation pipeline
-- [ ] TripoSR single-image path
-- [ ] MASt3R multi-image path
-- [ ] Depth Anything v2 CPU fallback
-- [ ] React frontend with shadcn/ui
-- [ ] React Three Fiber mesh viewer
-- [ ] SSE real-time progress
-- [ ] GLB / OBJ / STL download
-- [ ] Docker Compose full-stack setup
+- [x] FastAPI backend with ARQ job queue
+- [x] Segmentation pipeline (rembg / SAM2 protocol)
+- [x] Depth-lift path — monocular depth → point cloud (FlatDepthEstimator + Open3D)
+- [x] MASt3R multi-image protocol (injected reconstructor interface)
+- [x] React frontend with shadcn/ui
+- [x] React Three Fiber mesh viewer
+- [x] SSE real-time progress
+- [x] GLB / OBJ / STL download
+- [x] Docker Compose full-stack setup
+- [ ] TripoSR single-image path (real model integration)
+- [ ] MASt3R real model integration
+- [ ] Depth Anything v2 real model integration
 - [ ] CLI for local batch processing
+- [ ] Deployment config (Fly.io / Render)
 
 ---
 
