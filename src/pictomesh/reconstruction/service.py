@@ -75,6 +75,59 @@ class FlatDepthEstimator:
         return np.full((h, w), self._depth, dtype=np.float32)
 
 
+class DepthAnythingEstimator:
+    """Monocular depth via Depth Anything V2, normalized to metres.
+
+    Requires: uv sync --extra depth
+    """
+
+    def __init__(self, model: str = "depth-anything/Depth-Anything-V2-Small-hf") -> None:
+        try:
+            from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+        except ImportError as e:
+            raise ImportError(
+                "transformers is required for DepthAnythingEstimator. "
+                "Install with: uv sync --extra depth"
+            ) from e
+        self._processor = AutoImageProcessor.from_pretrained(model)
+        self._model = AutoModelForDepthEstimation.from_pretrained(model)
+        self._model.eval()
+
+    def estimate(self, image: np.ndarray) -> np.ndarray:
+        """Return an H×W float32 depth map normalized to [0.5, 5.0] metres.
+
+        Depth Anything V2 outputs affine-invariant relative depth; this linearly
+        maps it to a plausible metre range for Open3D compatibility.
+
+        Args:
+            image: H×W×3 BGR uint8 image.
+        """
+        import torch
+        from PIL import Image as PILImage
+
+        h, w = image.shape[:2]
+        pil = PILImage.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        inputs = self._processor(images=pil, return_tensors="pt")
+
+        with torch.no_grad():
+            outputs = self._model(**inputs)
+
+        depth = torch.nn.functional.interpolate(
+            outputs.predicted_depth.unsqueeze(1),
+            size=(h, w),
+            mode="bicubic",
+            align_corners=False,
+        ).squeeze().cpu().numpy()
+
+        d_min, d_max = float(depth.min()), float(depth.max())
+        if d_max > d_min:
+            depth = 0.5 + (depth - d_min) / (d_max - d_min) * 4.5
+        else:
+            depth = np.full_like(depth, 1.0)
+
+        return depth.astype(np.float32)
+
+
 # ── Service ───────────────────────────────────────────────────────────────────
 
 

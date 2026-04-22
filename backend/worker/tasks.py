@@ -13,7 +13,7 @@ from backend.models import JobStatus, ProgressEvent
 from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
 from pictomesh.pipeline import Pipeline
-from pictomesh.reconstruction.service import FlatDepthEstimator, ReconstructionService
+from pictomesh.reconstruction.service import DepthAnythingEstimator, FlatDepthEstimator, ReconstructionService
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService
 
 
@@ -25,7 +25,10 @@ def _build_pipeline() -> Pipeline:
     flt = FilteringService(CLIPEncoder())
     rec = ReconstructionService()
     msh = MeshService()
-    dep = FlatDepthEstimator()
+    try:
+        dep = DepthAnythingEstimator()
+    except ImportError:
+        dep = FlatDepthEstimator()
     return Pipeline(seg, flt, rec, msh, dep, image_threshold=settings.image_threshold)
 
 

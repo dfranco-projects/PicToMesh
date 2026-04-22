@@ -35,6 +35,9 @@ single-image = [
 segmentation = [
     "sam-2",
 ]
+depth = [
+    "transformers>=4.40.0",
+]
 
 [dependency-groups]
 dev = [
