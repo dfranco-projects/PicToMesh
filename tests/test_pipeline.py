@@ -231,6 +231,48 @@ class TestPipelineRouting:
         assert len(seg.received[0]) == 2
 
 
+class TestBackgroundMasking:
+    class _DepthRecordingReconstruction:
+        """Records the depth maps passed to from_depth."""
+
+        def __init__(self) -> None:
+            self.depths: list[np.ndarray] = []
+
+        def from_depth(self, depth, intrinsics, **kwargs):
+            self.depths.append(depth)
+            return _tiny_pcd()
+
+        def from_images(self, images, reconstructor):
+            return _tiny_pcd()
+
+    class _HalfMaskSegmentation:
+        """Marks the left half of each image as foreground."""
+
+        def process_batch(self, images):
+            out = []
+            for img in images:
+                rgba = _rgba(img.shape[0], img.shape[1])
+                rgba[:, : img.shape[1] // 2, 3] = 255
+                out.append(rgba)
+            return out
+
+    def test_background_depth_zeroed(self, tmp_path):
+        rec = self._DepthRecordingReconstruction()
+        p, *_ = _make_pipeline(
+            segmentation=self._HalfMaskSegmentation(), reconstruction=rec
+        )
+        p.run([_bgr()], tmp_path / "out")
+        depth = rec.depths[0]
+        assert (depth[:, :4] == 1.0).all()
+        assert (depth[:, 4:] == 0.0).all()
+
+    def test_empty_mask_keeps_full_depth(self, tmp_path):
+        rec = self._DepthRecordingReconstruction()
+        p, *_ = _make_pipeline(reconstruction=rec)  # default double: alpha all zero
+        p.run([_bgr()], tmp_path / "out")
+        assert (rec.depths[0] == 1.0).all()
+
+
 # ── E2E test (slow) ───────────────────────────────────────────────────────────
 
 

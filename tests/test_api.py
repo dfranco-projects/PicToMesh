@@ -127,6 +127,40 @@ def test_get_job_complete_has_mesh_url(client):
     assert body["mesh_url"] == "/meshes/abc/mesh.glb"
 
 
+def test_get_job_error_result_maps_to_failed(client):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    with (
+        patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.complete)),
+        patch.object(
+            Job,
+            "result",
+            new=AsyncMock(return_value={"status": "failed", "error": "boom"}),
+        ),
+    ):
+        r = client.get("/jobs/abc")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == JobStatus.failed
+    assert body["error"] == "boom"
+
+
+def test_get_job_raising_result_returns_failed(client):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    with (
+        patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.complete)),
+        patch.object(Job, "result", new=AsyncMock(side_effect=RuntimeError("task exploded"))),
+    ):
+        r = client.get("/jobs/abc")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == JobStatus.failed
+    assert "task exploded" in body["error"]
+
+
 # ── GET /meshes/{job_id}/{filename} ───────────────────────────────────────────
 
 
