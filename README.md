@@ -127,13 +127,49 @@ PicToMesh/
 
 ## Run Locally
 
+### With Docker
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with the Compose v2 plugin. The command is `docker compose` (with a space); the legacy `docker-compose` binary is not required.
+
 ```bash
 git clone https://github.com/dfranco-projects/PicToMesh.git
 cd PicToMesh
-docker-compose up --build
+docker compose up --build
 ```
 
 Open `http://localhost:3000`. The API is at `http://localhost:8000`.
+
+A `.env` file is optional. Defaults work out of the box; copy `.env.example` to `.env` only if you want to override them.
+
+### Without Docker
+
+Requires [uv](https://docs.astral.sh/uv/), Node 22+, and Redis. uv fetches the pinned Python 3.12 automatically.
+
+```bash
+# macOS
+brew install uv node redis
+
+# Debian/Ubuntu
+sudo apt install redis-server nodejs npm && curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then:
+
+```bash
+git clone https://github.com/dfranco-projects/PicToMesh.git
+cd PicToMesh
+make install                                  # create .venv and sync deps
+uv sync --extra single-image --extra depth    # model deps (rembg, Depth Anything v2)
+make dev                                      # starts redis, api, worker, frontend
+```
+
+Open `http://localhost:5173`.
+
+Prefer separate terminals? Run `make api`, `make worker`, and `make web` individually (needs a running Redis).
+
+If port 8000 is already taken, pick another one with `API_PORT=8010 make dev`; the Vite proxy follows automatically.
+
+The first job downloads model weights (u2net ~170 MB, Depth Anything v2 Small ~100 MB), so it is slow once; later jobs reuse the cache.
 
 ---
 
@@ -148,9 +184,9 @@ Open `http://localhost:3000`. The API is at `http://localhost:8000`.
 - [x] SSE real-time progress
 - [x] GLB / OBJ / STL download
 - [x] Docker Compose full-stack setup
+- [x] Depth Anything v2 real model integration
 - [ ] TripoSR single-image path (real model integration)
 - [ ] MASt3R real model integration
-- [ ] Depth Anything v2 real model integration
 - [ ] CLI for local batch processing
 - [ ] Deployment config (Fly.io / Render)
 
