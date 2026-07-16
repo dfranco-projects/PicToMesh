@@ -17,6 +17,26 @@ from pictomesh.reconstruction.service import DepthAnythingEstimator, FlatDepthEs
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService
 
 
+_MAX_SIDE = 512
+
+
+def _load_image(path: str) -> np.ndarray | None:
+    """Read an image and cap its longest side at _MAX_SIDE.
+
+    Full-resolution photos lift to point clouds with millions of points,
+    which Ball Pivoting cannot mesh within the job timeout.
+    """
+    img = cv2.imread(path)
+    if img is None:
+        return None
+    h, w = img.shape[:2]
+    scale = _MAX_SIDE / max(h, w)
+    if scale < 1.0:
+        size = (round(w * scale), round(h * scale))
+        img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+    return img
+
+
 def _build_pipeline() -> Pipeline:
     """Construct a default pipeline with real services."""
     seg = SegmentationService(RembgSegmentor())
@@ -50,7 +70,7 @@ async def process_images(
 
     images: list[np.ndarray] = []
     for p in image_paths:
-        img = cv2.imread(p)
+        img = _load_image(p)
         if img is not None:
             images.append(img)
 
@@ -64,8 +84,12 @@ async def process_images(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "mesh"
 
-    pipeline = _build_pipeline()
-    out_file = pipeline.run(images, output_path, fmt=fmt)
+    try:
+        pipeline = _build_pipeline()
+        out_file = pipeline.run(images, output_path, fmt=fmt)
+    except Exception as e:
+        await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.failed, message=str(e), progress=0.0))
+        return {"status": JobStatus.failed, "error": str(e)}
 
     mesh_url = f"/meshes/{job_id}/mesh.{fmt}"
     await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.complete, message="Done", progress=1.0))

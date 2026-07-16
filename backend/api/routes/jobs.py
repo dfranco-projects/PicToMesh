@@ -71,10 +71,15 @@ async def get_job(job_id: str, request: Request) -> JobResult:
     error: str | None = None
 
     if arq_status == ArqJobStatus.complete:
-        result = await job.result()
+        try:
+            result = await job.result()
+        except Exception as e:
+            return JobResult(job_id=job_id, status=JobStatus.failed, error=str(e))
         if isinstance(result, dict):
             mesh_url = result.get("mesh_url")
             error = result.get("error")
+            if error:
+                job_status = JobStatus.failed
 
     return JobResult(job_id=job_id, status=job_status, mesh_url=mesh_url, error=error)
 
