@@ -96,8 +96,9 @@ class DepthAnythingEstimator:
     def estimate(self, image: np.ndarray) -> np.ndarray:
         """Return an H×W float32 depth map normalized to [0.5, 5.0] metres.
 
-        Depth Anything V2 outputs affine-invariant relative depth; this linearly
-        maps it to a plausible metre range for Open3D compatibility.
+        Depth Anything V2 outputs relative inverse depth (larger values are
+        closer), so the mapping is reversed: nearest pixel lands at 0.5 m,
+        farthest at 5.0 m.
 
         Args:
             image: H×W×3 BGR uint8 image.
@@ -121,7 +122,7 @@ class DepthAnythingEstimator:
 
         d_min, d_max = float(depth.min()), float(depth.max())
         if d_max > d_min:
-            depth = 0.5 + (depth - d_min) / (d_max - d_min) * 4.5
+            depth = 0.5 + (d_max - depth) / (d_max - d_min) * 4.5
         else:
             depth = np.full_like(depth, 1.0)
 
