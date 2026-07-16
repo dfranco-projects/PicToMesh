@@ -90,9 +90,10 @@ class Pipeline:
             return self._reconstruction.from_images(bgr, self._reconstructor)
 
         clouds = []
-        for img in bgr:
+        for img, rgba in zip(bgr, segmented):
             h, w = img.shape[:2]
             depth = self._depth_estimator.estimate(img)
+            depth = self._mask_background(depth, rgba)
             intr = CameraIntrinsics.estimate(w, h)
             clouds.append(self._reconstruction.from_depth(depth, intr))
         return self._merge_clouds(clouds)
@@ -100,6 +101,20 @@ class Pipeline:
     @staticmethod
     def _rgba_to_bgr(img: np.ndarray) -> np.ndarray:
         return cv2.cvtColor(img[:, :, :3], cv2.COLOR_RGB2BGR)
+
+    @staticmethod
+    def _mask_background(depth: np.ndarray, rgba: np.ndarray) -> np.ndarray:
+        """Zero background depth so from_depth() drops those pixels.
+
+        If the alpha mask is entirely empty (segmentation found no subject),
+        the depth map is returned unmasked instead of producing an empty cloud.
+        """
+        alpha = rgba[:, :, 3]
+        if not alpha.any():
+            return depth
+        masked = depth.copy()
+        masked[alpha == 0] = 0.0
+        return masked
 
     @staticmethod
     def _merge_clouds(clouds: list[o3d.geometry.PointCloud]) -> o3d.geometry.PointCloud:
