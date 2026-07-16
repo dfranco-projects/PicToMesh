@@ -1,4 +1,4 @@
-.PHONY: install uninstall lint format test test-fast dev up down
+.PHONY: install uninstall lint format test test-fast api worker web dev up down
 .DEFAULT_GOAL := install
 
 # ── Environment ──────────────────────────────────────────────────────────────
@@ -36,6 +36,23 @@ test:
 
 test-fast:
 	uv run pytest tests/ -v -x --no-header -q
+
+# ── Local run (no Docker) ─────────────────────────────────────────────────────
+
+API_PORT ?= 8000
+
+api:
+	uv run uvicorn backend.api.main:app --reload --port $(API_PORT)
+
+worker:
+	uv run arq backend.worker.settings.WorkerSettings
+
+web:
+	@test -d frontend/node_modules || (cd frontend && npm install)
+	cd frontend && npm run dev
+
+dev:
+	@bash scripts/dev.sh
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 

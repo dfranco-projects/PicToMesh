@@ -180,6 +180,9 @@ node_modules/
 .DS_Store
 *.log
 
+# Media output from local api/worker runs
+media/
+
 # CLAUDE
 CLAUDE.md
 
