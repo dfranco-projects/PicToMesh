@@ -183,9 +183,6 @@ node_modules/
 # Media output from local api/worker runs
 media/
 
-# CLAUDE
-CLAUDE.md
-
 # Corporate CA certificates for docker builds (see README)
 docker/certs/*.crt
 docker/certs/*.pem
