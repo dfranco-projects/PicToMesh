@@ -121,6 +121,17 @@ class _Reconstructor:
         return _tiny_pcd()
 
 
+class _SingleImage:
+    """Records the RGBA images it was given; returns an empty trimesh."""
+
+    def __init__(self) -> None:
+        self.received: list[np.ndarray] = []
+
+    def reconstruct(self, rgba):
+        self.received.append(rgba)
+        return trimesh.Trimesh()
+
+
 def _make_pipeline(
     segmentation=None,
     filtering=None,
@@ -129,13 +140,23 @@ def _make_pipeline(
     depth_estimator=None,
     reconstructor=None,
     image_threshold=5,
+    single_image_reconstructor=None,
 ) -> tuple[Pipeline, _Segmentation, _Filtering, _Reconstruction, _Mesh]:
     seg = segmentation or _Segmentation()
     flt = filtering or _Filtering()
     rec = reconstruction or _Reconstruction()
     msh = mesh or _Mesh()
     dep = depth_estimator or _DepthEstimator()
-    p = Pipeline(seg, flt, rec, msh, dep, reconstructor, image_threshold)
+    p = Pipeline(
+        seg,
+        flt,
+        rec,
+        msh,
+        dep,
+        reconstructor,
+        image_threshold,
+        single_image_reconstructor=single_image_reconstructor,
+    )
     return p, seg, flt, rec, msh
 
 
@@ -223,6 +244,45 @@ class TestPipelineRouting:
         images = [_bgr() for _ in range(5)]
         p.run(images, tmp_path / "out")
         assert len(seg.received[0]) == 2
+
+
+class TestSingleImageRouting:
+    def test_below_threshold_uses_single_image_model(self, tmp_path):
+        single = _SingleImage()
+        p, _, _, rec, msh = _make_pipeline(image_threshold=5, single_image_reconstructor=single)
+        p.run([_bgr() for _ in range(3)], tmp_path / "out")
+        assert len(single.received) == 1
+        assert rec.depth_calls == 0
+        assert msh.bpa_calls == 0
+
+    def test_single_image_model_gets_first_segmented_image(self, tmp_path):
+        single = _SingleImage()
+        p, *_ = _make_pipeline(single_image_reconstructor=single)
+        p.run([_bgr(8, 8), _bgr(16, 16)], tmp_path / "out")
+        assert single.received[0].shape == (8, 8, 4)
+
+    def test_multiview_takes_precedence_at_threshold(self, tmp_path):
+        single = _SingleImage()
+        p, _, _, rec, msh = _make_pipeline(
+            reconstructor=_Reconstructor(), image_threshold=3, single_image_reconstructor=single
+        )
+        p.run([_bgr() for _ in range(3)], tmp_path / "out")
+        assert single.received == []
+        assert rec.multi_calls == 1
+        assert msh.poisson_calls == 1
+
+    def test_without_multiview_single_image_beats_merged_reliefs(self, tmp_path):
+        single = _SingleImage()
+        p, _, _, rec, msh = _make_pipeline(image_threshold=3, single_image_reconstructor=single)
+        p.run([_bgr() for _ in range(3)], tmp_path / "out")
+        assert len(single.received) == 1
+        assert rec.depth_calls == 0
+
+    def test_single_image_mesh_exported(self, tmp_path):
+        p, *_ = _make_pipeline(single_image_reconstructor=_SingleImage())
+        out = p.run([_bgr()], tmp_path / "mesh", fmt="obj")
+        assert out.suffix == ".obj"
+        assert out.exists()
 
 
 class TestOrientation:
