@@ -36,8 +36,10 @@ services:
     environment:
       PICTOMESH_REDIS_URL: redis://redis:6379
       PICTOMESH_MEDIA_DIR: /app/media
+      U2NET_HOME: /root/.cache/u2net  # rembg weights, kept with the other model caches
     volumes:
       - media_data:/app/media
+      - model_cache:/root/.cache  # ~2.5 GB of weights (TripoSR, CLIP, Depth Anything, rembg)
     depends_on:
       - redis
     restart: unless-stopped
@@ -55,3 +57,4 @@ services:
 volumes:
   redis_data:
   media_data:
+  model_cache:
