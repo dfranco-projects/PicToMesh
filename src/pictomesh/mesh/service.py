@@ -22,9 +22,16 @@ class MeshService:
 
         Best for dense, uniformly sampled point clouds. Higher depth → finer
         detail but slower. Produces a watertight mesh.
+
+        Runs single-threaded: Open3D's parallel octree build races and segfaults.
+        Measured on a 5k-point box cloud, one call per fresh process — n_threads=-1
+        (the default, all cores) crashed 8/25, n_threads=2 crashed 3/25, n_threads=1
+        crashed 0/25. Costs ~1.5x runtime (1.9s → 3.0s at depth 9 on 50k points).
         """
         pcd = self._ensure_normals(pcd)
-        mesh_o3d, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
+        mesh_o3d, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+            pcd, depth=depth, n_threads=1
+        )
         return self._to_trimesh(mesh_o3d)
 
     def ball_pivoting(
