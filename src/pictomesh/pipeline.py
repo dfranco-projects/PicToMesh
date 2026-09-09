@@ -83,20 +83,23 @@ class Pipeline:
         keep = self._filtering.filter(images)
         images = [images[i] for i in keep]
 
-        # 2. Remove backgrounds → RGBA
-        segmented = self._segmentation.process_batch(images)
-
-        # 3. Reconstruct → mesh
+        # 2. Pick the route before segmenting: the single-image model consumes only
+        #    the first image that survived filtering, so segmenting the rest is waste.
         use_multi = len(images) >= self._image_threshold and self._reconstructor is not None
-        if not use_multi and self._single_image is not None:
-            # The model takes one image; use the first that survived filtering.
+        use_single = not use_multi and self._single_image is not None
+
+        # 3. Remove backgrounds → RGBA
+        segmented = self._segmentation.process_batch(images[:1] if use_single else images)
+
+        # 4. Reconstruct → mesh
+        if use_single:
             trimesh_mesh = self._single_image.reconstruct(segmented[0])
         else:
             pcd = self._reconstruct(images, segmented)
             pcd.transform(CAMERA_TO_GLTF)
             trimesh_mesh = self._mesh.poisson(pcd) if use_multi else self._mesh.ball_pivoting(pcd)
 
-        # 4. Export
+        # 5. Export
         return self._mesh.export(trimesh_mesh, output_path, fmt)
 
     # ── private ───────────────────────────────────────────────────────────────
