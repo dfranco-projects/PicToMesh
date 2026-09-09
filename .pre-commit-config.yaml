@@ -1,0 +1,17 @@
+# Installed by `make install` (or `uv run pre-commit install`); runs on every commit.
+# Both hooks rewrite staged files in place and fail the commit when they changed
+# anything or when unfixable lint errors remain: re-stage and commit again.
+# They call the project's own ruff via uv, so the version always matches uv.lock.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check --fix
+        entry: uv run --no-sync ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --no-sync ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]

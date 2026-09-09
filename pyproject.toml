@@ -47,6 +47,7 @@ dev = [
     "anyio[trio]>=4.13.0",
     "arq>=0.28.0",
     "fakeredis[lua]>=2.35.1",
+    "pre-commit>=4.6.2",
     "pydantic-settings>=2.14.0",
     "pytest>=9.0.3",
     "pytest-anyio>=0.0.0",

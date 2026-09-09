@@ -11,6 +11,7 @@ install:
 	else \
 		bash bin/install.sh; \
 	fi
+	@uv run --no-sync pre-commit install
 	@echo "\033[0;32m✨ Ready. Run: source .venv/bin/activate\033[0m"
 
 uninstall:
