@@ -169,25 +169,19 @@ class TestPipelineRouting:
         assert rec.multi_calls == 0
 
     def test_above_threshold_with_reconstructor_uses_multiview(self, tmp_path):
-        p, _, _, rec, msh = _make_pipeline(
-            reconstructor=_Reconstructor(), image_threshold=3
-        )
+        p, _, _, rec, msh = _make_pipeline(reconstructor=_Reconstructor(), image_threshold=3)
         p.run([_bgr() for _ in range(5)], tmp_path / "out")
         assert rec.multi_calls == 1
         assert rec.depth_calls == 0
 
     def test_above_threshold_with_reconstructor_uses_poisson(self, tmp_path):
-        p, _, _, rec, msh = _make_pipeline(
-            reconstructor=_Reconstructor(), image_threshold=3
-        )
+        p, _, _, rec, msh = _make_pipeline(reconstructor=_Reconstructor(), image_threshold=3)
         p.run([_bgr() for _ in range(5)], tmp_path / "out")
         assert msh.poisson_calls == 1
         assert msh.bpa_calls == 0
 
     def test_above_threshold_without_reconstructor_falls_back_to_depth(self, tmp_path):
-        p, _, _, rec, msh = _make_pipeline(
-            reconstructor=None, image_threshold=3
-        )
+        p, _, _, rec, msh = _make_pipeline(reconstructor=None, image_threshold=3)
         p.run([_bgr() for _ in range(5)], tmp_path / "out")
         assert rec.depth_calls == 5
         assert rec.multi_calls == 0
@@ -212,6 +206,7 @@ class TestPipelineRouting:
     def test_depth_called_once_per_image(self, tmp_path):
         class _CountingDepth:
             calls = 0
+
             def estimate(self, img):
                 _CountingDepth.calls += 1
                 return np.ones(img.shape[:2], dtype=np.float32)
@@ -230,7 +225,35 @@ class TestPipelineRouting:
         assert len(seg.received[0]) == 2
 
 
-class TestBackgroundMasking:
+class TestOrientation:
+    class _PointReconstruction:
+        """Returns a single known camera-frame point (x right, y down, z forward)."""
+
+        def from_depth(self, depth, intrinsics, **kwargs):
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(np.array([[0.1, 0.2, 2.0]]))
+            return pcd
+
+        def from_images(self, images, reconstructor):
+            return self.from_depth(None, None)
+
+    class _RecordingMesh(_Mesh):
+        def __init__(self) -> None:
+            super().__init__()
+            self.clouds: list[np.ndarray] = []
+
+        def ball_pivoting(self, pcd):
+            self.clouds.append(np.asarray(pcd.points).copy())
+            return super().ball_pivoting(pcd)
+
+    def test_camera_frame_rotated_to_gltf(self, tmp_path):
+        msh = self._RecordingMesh()
+        p, *_ = _make_pipeline(reconstruction=self._PointReconstruction(), mesh=msh)
+        p.run([_bgr()], tmp_path / "out")
+        np.testing.assert_allclose(msh.clouds[0], [[0.1, -0.2, -2.0]])
+
+
+class TestDepthFitting:
     class _DepthRecordingReconstruction:
         """Records the depth maps passed to from_depth."""
 
@@ -257,9 +280,7 @@ class TestBackgroundMasking:
 
     def test_background_depth_zeroed(self, tmp_path):
         rec = self._DepthRecordingReconstruction()
-        p, *_ = _make_pipeline(
-            segmentation=self._HalfMaskSegmentation(), reconstruction=rec
-        )
+        p, *_ = _make_pipeline(segmentation=self._HalfMaskSegmentation(), reconstruction=rec)
         p.run([_bgr()], tmp_path / "out")
         depth = rec.depths[0]
         assert (depth[:, :4] == 1.0).all()
@@ -270,6 +291,42 @@ class TestBackgroundMasking:
         p, *_ = _make_pipeline(reconstruction=rec)  # default double: alpha all zero
         p.run([_bgr()], tmp_path / "out")
         assert (rec.depths[0] == 1.0).all()
+
+    class _GradientDepth:
+        """Depth increasing left to right, 2 m → 4 m, as a whole-frame estimator would."""
+
+        def estimate(self, image):
+            h, w = image.shape[:2]
+            return np.tile(np.linspace(2.0, 4.0, w, dtype=np.float32), (h, 1))
+
+    def test_subject_depth_rescaled_to_relief(self, tmp_path):
+        rec = self._DepthRecordingReconstruction()
+        p, *_ = _make_pipeline(
+            segmentation=self._HalfMaskSegmentation(),
+            reconstruction=rec,
+            depth_estimator=self._GradientDepth(),
+        )
+        p.run([_bgr()], tmp_path / "out")
+        depth = rec.depths[0]
+        # 8 px frame → fx = 8; 4 px subject → 0.5 m wide at 1 m → relief = 0.25 × 0.5 m
+        assert depth[:, 0] == pytest.approx(1.0)
+        assert depth[:, 3] == pytest.approx(1.125)
+        assert (depth[:, 4:] == 0.0).all()
+
+    def test_depth_estimated_on_original_image(self, tmp_path):
+        class _RecordingDepth:
+            def __init__(self) -> None:
+                self.images: list[np.ndarray] = []
+
+            def estimate(self, image):
+                self.images.append(image)
+                return np.ones(image.shape[:2], dtype=np.float32)
+
+        dep = _RecordingDepth()
+        p, *_ = _make_pipeline(depth_estimator=dep)
+        original = np.full((8, 8, 3), 200, dtype=np.uint8)
+        p.run([original], tmp_path / "out")
+        assert (dep.images[0] == 200).all()  # the cutout double would be all zeros
 
 
 # ── E2E test (slow) ───────────────────────────────────────────────────────────
@@ -287,6 +344,7 @@ class TestPipelineE2E:
     @pytest.fixture(scope="class")
     def pipeline(self) -> Pipeline:
         seg_svc = SegmentationService(RembgSegmentor())
+
         # Use a pass-through encoder so filtering is fast (no CLIP download)
         class _IdentityEncoder:
             def encode(self, images):
@@ -296,10 +354,12 @@ class TestPipelineE2E:
         flt_svc = FilteringService(_IdentityEncoder(), similarity_threshold=0.5)
         rec_svc = ReconstructionService()
         mesh_svc = MeshService()
+
         # Vary depth per call so the merged cloud has unique point positions.
         class _VaryingDepth:
             def __init__(self):
                 self._d = 0.5
+
             def estimate(self, image):
                 self._d += 0.5
                 return np.full(image.shape[:2], self._d, dtype=np.float32)
@@ -309,6 +369,7 @@ class TestPipelineE2E:
     @pytest.fixture(scope="class")
     def chair_images(self) -> list[np.ndarray]:
         import cv2
+
         paths = sorted((ASSETS).glob("chair_*.jpeg"))
         imgs = [cv2.imread(str(p)) for p in paths]
         # Downscale to keep BPA fast during tests
