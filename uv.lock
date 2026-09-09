@@ -1659,7 +1659,7 @@ requires-dist = [
     { name = "torchvision", marker = "sys_platform == 'linux'", specifier = ">=0.26.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "transformers", marker = "extra == 'depth'", specifier = ">=4.40.0" },
-    { name = "transformers", marker = "extra == 'single-image'", specifier = ">=5.5.4" },
+    { name = "transformers", marker = "extra == 'single-image'", specifier = ">=4.40.0" },
     { name = "trimesh", specifier = ">=4.11.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.45.0" },
 ]

@@ -32,7 +32,7 @@ single-image = [
     "omegaconf>=2.3.0",
     "pymcubes>=0.1.6",
     "rembg>=2.0.69",
-    "transformers>=5.5.4",
+    "transformers>=4.40.0",
 ]
 segmentation = [
     "sam-2",
