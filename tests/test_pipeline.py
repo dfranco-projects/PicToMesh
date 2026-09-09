@@ -278,6 +278,16 @@ class TestSingleImageRouting:
         assert len(single.received) == 1
         assert rec.depth_calls == 0
 
+    def test_only_the_used_image_is_segmented(self, tmp_path):
+        """Segmentation is expensive; the discarded images must not reach it."""
+        seg = _Segmentation()
+        single = _SingleImage()
+        p, *_ = _make_pipeline(
+            segmentation=seg, image_threshold=3, single_image_reconstructor=single
+        )
+        p.run([_bgr() for _ in range(4)], tmp_path / "out")
+        assert len(seg.received[0]) == 1
+
     def test_single_image_mesh_exported(self, tmp_path):
         p, *_ = _make_pipeline(single_image_reconstructor=_SingleImage())
         out = p.run([_bgr()], tmp_path / "mesh", fmt="obj")
