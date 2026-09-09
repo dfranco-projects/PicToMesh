@@ -1612,8 +1612,10 @@ single-image = [
     { name = "einops" },
     { name = "huggingface-hub" },
     { name = "omegaconf" },
+    { name = "pymcubes" },
     { name = "rembg", version = "2.0.69", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "rembg", version = "2.0.75", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "transformers" },
 ]
 
 [package.dev-dependencies]
@@ -1646,6 +1648,7 @@ requires-dist = [
     { name = "opencv-python", specifier = ">=4.13.0.92" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "pydantic-settings", specifier = ">=2.14.0" },
+    { name = "pymcubes", marker = "extra == 'single-image'", specifier = ">=0.1.6" },
     { name = "python-multipart", specifier = ">=0.0.26" },
     { name = "rembg", marker = "extra == 'single-image'", specifier = ">=2.0.69" },
     { name = "sam-2", marker = "extra == 'segmentation'", git = "https://github.com/facebookresearch/sam2.git" },
@@ -1656,6 +1659,7 @@ requires-dist = [
     { name = "torchvision", marker = "sys_platform == 'linux'", specifier = ">=0.26.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "transformers", marker = "extra == 'depth'", specifier = ">=4.40.0" },
+    { name = "transformers", marker = "extra == 'single-image'", specifier = ">=5.5.4" },
     { name = "trimesh", specifier = ">=4.11.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.45.0" },
 ]
@@ -1949,6 +1953,32 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9a/f5/83955aa915ea5e04cecb32612d419e8341604d0b898c2ebe4277adbc4c6b/pymatting-1.1.15.tar.gz", hash = "sha256:67cbadd68d04696357461ad1861bcb3c2adc9ec5fcd38d524db606addabe745a", size = 44424, upload-time = "2026-01-26T09:27:22.395Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/59/87a27f2539b0a9436853484e80f6a3ef96c30caa0316dce85f1f29d9e953/pymatting-1.1.15-py3-none-any.whl", hash = "sha256:1bd7f04651f1e02b390b88b84cf97c7f4c871ad8568945e4303746bf3ab48ecc", size = 54862, upload-time = "2026-01-26T09:27:20.856Z" },
+]
+
+[[package]]
+name = "pymcubes"
+version = "0.1.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/fb/8660bc09b05e5b7209377a476e937f36c2e4353a5300e6c71283fd6f8c2b/pymcubes-0.1.6.tar.gz", hash = "sha256:1a72476a22a4c98907acec0c5ef8d46f4451fa987c7efeaf970990775826ed8b", size = 109395, upload-time = "2024-07-03T23:14:43.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/40/cd07da8d67a3e70a22e3fcd86280a287dc95f9118b9935c7fb6771850be2/PyMCubes-0.1.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:8b66c714abb554dbb0cc3fa75fc1fd24e27dc2cc618a2685832b825156848792", size = 54392, upload-time = "2024-07-03T23:17:13.756Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/ef/0ba7253b8ea48bc6207ef7f5dbcf61df7237bf8ae0c1bb86ce39c6432cfa/PyMCubes-0.1.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:e37a81ffff099e8d275c4c973f34978934720120a02d06198c410f48c9f6b7d0", size = 52470, upload-time = "2024-07-03T23:15:24.635Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/46/c4d6d8faed01bb63be83570a9d8d4b88963d82d84085fd95cf5423319d23/PyMCubes-0.1.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:16ed358f20f514def6b4669d4714f86429c609421f167a2fd28731b71adf381a", size = 318360, upload-time = "2024-07-03T23:15:52.994Z" },
+    { url = "https://files.pythonhosted.org/packages/60/f9/db2002e639681476d863674e1f52290f02d7a701700676f9f53c5f8ea4d2/PyMCubes-0.1.6-cp310-cp310-win_amd64.whl", hash = "sha256:8433ecf1ef8dca963056d0b5e8ce9d6a1d5160764a199fd1a375a4ab58e89a3c", size = 50022, upload-time = "2024-07-03T23:18:51.281Z" },
+    { url = "https://files.pythonhosted.org/packages/62/d3/4eb02520fd20558ec581af2bd5f670fd58c31c5630d90a7e30f1be501222/PyMCubes-0.1.6-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:e859a7aaa97bfc909079ce1ecbc12f0bc61b49b8b01ee0d59eaabf9a7f266a9f", size = 54338, upload-time = "2024-07-03T23:17:15.464Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/e8/c39c7eedb7a2b514092ea8017b11f1c3ad3cc9398e5afa7568739a859447/PyMCubes-0.1.6-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8f1246d4ef9dee648a111060aac95f0b99f9b36c937436e75af4cae57b5f50f7", size = 52324, upload-time = "2024-07-03T23:15:26.161Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/e6/5796cf17a909d6048c0c2cfd70577029fb39c15e5aa098df5336b316a6c7/PyMCubes-0.1.6-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:323b1d6454e3092ce2ba42c0ce69a753cb646fbda33d5274f03514a68f4441c8", size = 336818, upload-time = "2024-07-03T23:15:54.554Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/4c/30cfeb335589ddcb72db0f4f68e5fce703ada8d05e4c2b37b5125bbae1a9/PyMCubes-0.1.6-cp311-cp311-win_amd64.whl", hash = "sha256:4e326cba1471047567e016c39fa2b4934dd451e9f1feec63a35e23bbcab1d34c", size = 50006, upload-time = "2024-07-03T23:18:52.403Z" },
+    { url = "https://files.pythonhosted.org/packages/27/17/71df57cadc0f34d31f0348f6067dea19de3c100e9aed069b792e8c4ca8fe/PyMCubes-0.1.6-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:6dea0bfb68778d7f9becd87c86a396c9ffbb8f322c184967fa2a48d430974513", size = 53794, upload-time = "2024-07-03T23:17:16.767Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/50/78eeda22066c42c6a5c77b7b762e670880b8ec970b1f38ba11d575c3ba31/PyMCubes-0.1.6-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:138eaa87d2b8daf7488102070191e8e99254d48b6f08577a618db6e95fd53f90", size = 51547, upload-time = "2024-07-03T23:15:28.124Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/13/63d018ea286c95b758f8b5cbe97d88a16b38f5672411138287bd2123d877/PyMCubes-0.1.6-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ea366a2064af0846093e0ad3f9035e375f4b14b62bb565c95dcc8dcaf78308a5", size = 339385, upload-time = "2024-07-03T23:15:56.087Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/3e/a9a9f624a364166b1b4513f5ae8627fb59eea64eccf3e5a91c82c2b7b44e/PyMCubes-0.1.6-cp312-cp312-win_amd64.whl", hash = "sha256:8926475690ce1e0be2460c941a51cdda6eed6f10986073d23fc67535bc70aa78", size = 49968, upload-time = "2024-07-03T23:18:53.376Z" },
 ]
 
 [[package]]
@@ -2925,15 +2955,15 @@ dependencies = [
     { name = "typing-extensions", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-linux_s390x.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-manylinux_2_28_aarch64.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-linux_s390x.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-manylinux_2_28_aarch64.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-linux_s390x.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-linux_s390x.whl", hash = "sha256:3d8a7789e61dbf11f8922672c43354614b9b0debd40899c0a94f1ad9e0bd6bd9", upload-time = "2026-04-27T21:55:13Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:c7dbae3a5cd0a4a3eab760742b9be3bd79282259488cf83176197cef31ce1610", upload-time = "2026-04-27T21:55:20Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:f378df648bf7fb94bbc820dfec37d3d346bd1703c692a2215edebf6edcef8b75", upload-time = "2026-04-27T21:55:27Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-linux_s390x.whl", hash = "sha256:5214b203ee187f8746c66f1378b72611b7c1e15c5cb325037541899e705ea24e", upload-time = "2026-04-27T21:55:40Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:46fbb0aa257bb781efbfad648f5b045c0e232573b661f1461593db61342e9096", upload-time = "2026-04-28T00:05:38Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:8a56a8c95531ef0e454510ba8bbd9d11dc7a9000337265210b10f6bfeacdd485", upload-time = "2026-04-28T00:05:47Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-linux_s390x.whl", hash = "sha256:2db3ae5404e32cb42b5fcbd94f13607761eaec0cf1687fde95095289d1e26cfb", upload-time = "2026-04-28T00:06:06Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:70ecb2659af6373b7c5336e692e665605b0201ea21ff51aaea47e1d75ea6b5aa", upload-time = "2026-04-28T00:06:14Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:f82e2ae20c1545bb03997d1cc3143d94e14b800038669ee1aca45808a9acc338", upload-time = "2026-04-28T00:06:24Z" },
 ]
 
 [[package]]
@@ -2980,12 +3010,12 @@ dependencies = [
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:97df9a8595dce256d2e6dd16bbcd1c68dd00eec712e37d4b6ec7985453ddc2aa" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:967048f44f5bfcd05afed1c4b595cb30b4419fa0e08c296be403c88e82396c30" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:c11e55041f6b84a6c4fb28981b901475aa81c38695ccec6ddfcc54c3fa9fac4f" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:7fcc4584e9f2f8914f898a01437f25b16222fb0bfb3fdeba59cb1b0c640b0995" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:17f0b542331fc94230b4214c6d123f038af7330fd81019608c0d2402f3bc3079" },
-    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:cf547dc0975eb40bc3249be4ccbeb736597d2c3ece305b1c4e5b7a5dd7363567" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:97df9a8595dce256d2e6dd16bbcd1c68dd00eec712e37d4b6ec7985453ddc2aa", upload-time = "2026-03-23T15:36:09Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:967048f44f5bfcd05afed1c4b595cb30b4419fa0e08c296be403c88e82396c30", upload-time = "2026-03-23T15:36:09Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:c11e55041f6b84a6c4fb28981b901475aa81c38695ccec6ddfcc54c3fa9fac4f", upload-time = "2026-03-23T15:36:09Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:7fcc4584e9f2f8914f898a01437f25b16222fb0bfb3fdeba59cb1b0c640b0995", upload-time = "2026-03-23T15:36:09Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:17f0b542331fc94230b4214c6d123f038af7330fd81019608c0d2402f3bc3079", upload-time = "2026-03-23T15:36:09Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.26.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:cf547dc0975eb40bc3249be4ccbeb736597d2c3ece305b1c4e5b7a5dd7363567", upload-time = "2026-03-23T15:36:09Z" },
 ]
 
 [[package]]
