@@ -8,6 +8,7 @@ from backend.config import settings
 from backend.models import JobStatus, ProgressEvent
 from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
+from pictomesh.mesh.triposr import TripoSRReconstructor
 from pictomesh.pipeline import Pipeline
 from pictomesh.reconstruction.service import (
     DepthAnythingEstimator,
@@ -48,7 +49,19 @@ def _build_pipeline() -> Pipeline:
         dep = DepthAnythingEstimator()
     except ImportError:
         dep = FlatDepthEstimator()
-    return Pipeline(seg, flt, rec, msh, dep, image_threshold=settings.image_threshold)
+    try:
+        single = TripoSRReconstructor()
+    except ImportError:
+        single = None
+    return Pipeline(
+        seg,
+        flt,
+        rec,
+        msh,
+        dep,
+        image_threshold=settings.image_threshold,
+        single_image_reconstructor=single,
+    )
 
 
 async def _publish(redis: ArqRedis, event: ProgressEvent) -> None:
@@ -74,7 +87,12 @@ async def process_images(
     """ARQ task: run the pipeline and return the output mesh path."""
     redis: ArqRedis = ctx["redis"]
 
-    await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.in_progress, message="Loading images", progress=0.05))
+    await _publish(
+        redis,
+        ProgressEvent(
+            job_id=job_id, status=JobStatus.in_progress, message="Loading images", progress=0.05
+        ),
+    )
 
     images: list[np.ndarray] = []
     for p in image_paths:
@@ -83,10 +101,20 @@ async def process_images(
             images.append(img)
 
     if not images:
-        await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.failed, message="No readable images", progress=0.0))
+        await _publish(
+            redis,
+            ProgressEvent(
+                job_id=job_id, status=JobStatus.failed, message="No readable images", progress=0.0
+            ),
+        )
         return {"status": JobStatus.failed, "error": "No readable images"}
 
-    await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.in_progress, message="Running pipeline", progress=0.2))
+    await _publish(
+        redis,
+        ProgressEvent(
+            job_id=job_id, status=JobStatus.in_progress, message="Running pipeline", progress=0.2
+        ),
+    )
 
     output_dir = settings.media_dir / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -95,10 +123,15 @@ async def process_images(
     try:
         out_file = ctx["pipeline"].run(images, output_path, fmt=fmt)
     except Exception as e:
-        await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.failed, message=str(e), progress=0.0))
+        await _publish(
+            redis,
+            ProgressEvent(job_id=job_id, status=JobStatus.failed, message=str(e), progress=0.0),
+        )
         return {"status": JobStatus.failed, "error": str(e)}
 
     mesh_url = f"/meshes/{job_id}/mesh.{fmt}"
-    await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.complete, message="Done", progress=1.0))
+    await _publish(
+        redis, ProgressEvent(job_id=job_id, status=JobStatus.complete, message="Done", progress=1.0)
+    )
 
     return {"status": JobStatus.complete, "mesh_url": mesh_url, "output_path": str(out_file)}

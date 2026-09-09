@@ -8,6 +8,7 @@ import open3d as o3d
 
 from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import ExportFormat, MeshService
+from pictomesh.mesh.triposr import SingleImageReconstructor
 from pictomesh.reconstruction.service import (
     CameraIntrinsics,
     DepthEstimator,
@@ -30,9 +31,10 @@ class Pipeline:
     """Top-level orchestrator: BGR images → exported mesh file.
 
     Routing logic:
-      < image_threshold images   →  depth-lift each image → BPA mesh
-      >= image_threshold images  →  MASt3R multi-view (if reconstructor provided) → Poisson mesh
+      < image_threshold images   →  single-image model (TripoSR) on the first image, if provided
                                      else depth-lift each image → BPA mesh
+      >= image_threshold images  →  MASt3R multi-view (if reconstructor provided) → Poisson mesh
+                                     else same as below threshold
     """
 
     def __init__(
@@ -44,6 +46,7 @@ class Pipeline:
         depth_estimator: DepthEstimator,
         reconstructor: MultiViewReconstructor | None = None,
         image_threshold: int = 5,
+        single_image_reconstructor: SingleImageReconstructor | None = None,
     ) -> None:
         self._segmentation = segmentation
         self._filtering = filtering
@@ -52,6 +55,7 @@ class Pipeline:
         self._depth_estimator = depth_estimator
         self._reconstructor = reconstructor
         self._image_threshold = image_threshold
+        self._single_image = single_image_reconstructor
 
     def run(
         self,
@@ -82,13 +86,17 @@ class Pipeline:
         # 2. Remove backgrounds → RGBA
         segmented = self._segmentation.process_batch(images)
 
-        # 3. Reconstruct → Open3D point cloud, re-oriented for glTF
-        pcd = self._reconstruct(images, segmented)
-        pcd.transform(CAMERA_TO_GLTF)
-
-        # 4. Mesh + export
+        # 3. Reconstruct → mesh
         use_multi = len(images) >= self._image_threshold and self._reconstructor is not None
-        trimesh_mesh = self._mesh.poisson(pcd) if use_multi else self._mesh.ball_pivoting(pcd)
+        if not use_multi and self._single_image is not None:
+            # The model takes one image; use the first that survived filtering.
+            trimesh_mesh = self._single_image.reconstruct(segmented[0])
+        else:
+            pcd = self._reconstruct(images, segmented)
+            pcd.transform(CAMERA_TO_GLTF)
+            trimesh_mesh = self._mesh.poisson(pcd) if use_multi else self._mesh.ball_pivoting(pcd)
+
+        # 4. Export
         return self._mesh.export(trimesh_mesh, output_path, fmt)
 
     # ── private ───────────────────────────────────────────────────────────────
