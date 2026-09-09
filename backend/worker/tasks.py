@@ -57,6 +57,15 @@ async def _publish(redis: ArqRedis, event: ProgressEvent) -> None:
     await redis.publish(channel, event.model_dump_json())
 
 
+async def startup(ctx: dict) -> None:
+    """Build the pipeline once per worker process.
+
+    Model weights (rembg u2net, Depth Anything) load here rather than per job,
+    where they otherwise dominate the runtime of every single job.
+    """
+    ctx["pipeline"] = _build_pipeline()
+
+
 async def process_images(
     ctx: dict,
     job_id: str,
@@ -85,8 +94,7 @@ async def process_images(
     output_path = output_dir / "mesh"
 
     try:
-        pipeline = _build_pipeline()
-        out_file = pipeline.run(images, output_path, fmt=fmt)
+        out_file = ctx["pipeline"].run(images, output_path, fmt=fmt)
     except Exception as e:
         await _publish(redis, ProgressEvent(job_id=job_id, status=JobStatus.failed, message=str(e), progress=0.0))
         return {"status": JobStatus.failed, "error": str(e)}
