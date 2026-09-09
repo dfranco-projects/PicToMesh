@@ -2,6 +2,9 @@
 # Both hooks rewrite staged files in place and fail the commit when they changed
 # anything or when unfixable lint errors remain: re-stage and commit again.
 # They call the project's own ruff via uv, so the version always matches uv.lock.
+# The commit-msg hook rejects Claude co-author trailers, which would add "claude" to the
+# GitHub contributors list.
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: local
     hooks:
@@ -15,3 +18,8 @@ repos:
         entry: uv run --no-sync ruff format --force-exclude
         language: system
         types_or: [python, pyi]
+      - id: no-claude-trailers
+        name: reject claude trailers
+        entry: bin/check-commit-msg.sh
+        language: script
+        stages: [commit-msg]

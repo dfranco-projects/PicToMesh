@@ -175,7 +175,7 @@ If port 8000 is already taken, pick another one with `API_PORT=8010 make dev`; t
 
 The worker downloads model weights on its first start (TripoSR ~1.7 GB, plus CLIP, Depth Anything v2 Small and u2net), so that start is slow once; later runs reuse the cache.
 
-Commits run `ruff check --fix` and `ruff format` through pre-commit. If a hook rewrites a file or an unfixable lint error remains, the commit is rejected: re-stage and commit again.
+Commits run `ruff check --fix` and `ruff format` through pre-commit. If a hook rewrites a file or an unfixable lint error remains, the commit is rejected: re-stage and commit again. A commit-msg hook also rejects `Co-Authored-By: Claude` trailers.
 
 ---
 
