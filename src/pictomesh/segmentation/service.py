@@ -74,9 +74,7 @@ class SegmentationService:
     @staticmethod
     def _validate_image(image: np.ndarray) -> None:
         if image.ndim != 3 or image.shape[2] != 3:
-            raise ValueError(
-                f"Expected H×W×3 BGR image, got shape {image.shape}."
-            )
+            raise ValueError(f"Expected H×W×3 BGR image, got shape {image.shape}.")
 
     @staticmethod
     def _validate_mask(mask: np.ndarray, image: np.ndarray) -> None:
@@ -98,6 +96,7 @@ class RembgSegmentor:
     def __init__(self) -> None:
         try:
             from rembg import new_session
+
             self._session = new_session()
         except ImportError as e:
             raise ImportError(
@@ -110,6 +109,6 @@ class RembgSegmentor:
         from rembg import remove
 
         pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        result = remove(pil, session=self._session)          # RGBA PIL image
-        alpha = np.array(result)[:, :, 3]                   # extract alpha
-        return alpha > 128                                   # bool mask
+        result = remove(pil, session=self._session)  # RGBA PIL image
+        alpha = np.array(result)[:, :, 3]  # extract alpha
+        return alpha > 128  # bool mask

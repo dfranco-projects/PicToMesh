@@ -4,9 +4,9 @@ from PIL import Image
 
 
 def get_image_paths(
-        folder: str, extensions: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
+    folder: str, extensions: tuple[str, ...] = (".jpg", ".jpeg", ".png")
 ) -> list[str]:
-    '''
+    """
     Creates a list of image file paths from a folder.
 
     Args:
@@ -15,7 +15,7 @@ def get_image_paths(
 
     Returns:
         List[str]: Sorted list of full image file paths matching the given extensions.
-    '''
+    """
 
     return sorted(
         [
@@ -23,11 +23,11 @@ def get_image_paths(
             for filename in os.listdir(folder)
             if filename.lower().endswith(extensions)
         ]
-    )   
+    )
 
 
 def load_images_from_paths(paths: list[str]) -> list[Image.Image]:
-    '''
+    """
     Loads a list of image paths as PIL Image objects ensuring it's in RGB mode.
 
     Args:
@@ -35,6 +35,5 @@ def load_images_from_paths(paths: list[str]) -> list[Image.Image]:
 
     Returns:
         List[Image.Image]: List of RGB mode Image object.
-    '''
-    return [Image.open(path).convert('RGB') for path in paths]
-
+    """
+    return [Image.open(path).convert("RGB") for path in paths]

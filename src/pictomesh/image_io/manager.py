@@ -59,7 +59,4 @@ class ImageManager:
     # ── private ──────────────────────────────────────────────────────────────
 
     def _discover_paths(self) -> list[Path]:
-        return sorted(
-            p for p in self.folder_path.iterdir()
-            if p.suffix.lower() in self.extensions
-        )
+        return sorted(p for p in self.folder_path.iterdir() if p.suffix.lower() in self.extensions)

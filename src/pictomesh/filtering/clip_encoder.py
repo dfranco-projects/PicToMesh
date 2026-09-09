@@ -58,13 +58,13 @@ class CLIPEncoder:
             import open_clip
             import torch
         except ImportError as e:
-            raise ImportError(
-                "open-clip-torch and torch are required for CLIPEncoder."
-            ) from e
+            raise ImportError("open-clip-torch and torch are required for CLIPEncoder.") from e
 
         self._device = (
-            "mps" if torch.backends.mps.is_available()
-            else "cuda" if torch.cuda.is_available()
+            "mps"
+            if torch.backends.mps.is_available()
+            else "cuda"
+            if torch.cuda.is_available()
             else "cpu"
         )
         self._model, _, self._preprocess = open_clip.create_model_and_transforms(

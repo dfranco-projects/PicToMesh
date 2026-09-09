@@ -88,8 +88,8 @@ class TestRemoveBackground:
     def test_half_mask_splits_alpha(self, half_service, image):
         out = half_service.remove_background(image)
         h = image.shape[0]
-        assert np.all(out[: h // 2, :, 3] == 255)   # foreground rows
-        assert np.all(out[h // 2 :, :, 3] == 0)     # background rows
+        assert np.all(out[: h // 2, :, 3] == 255)  # foreground rows
+        assert np.all(out[h // 2 :, :, 3] == 0)  # background rows
 
     def test_bgr_converted_to_rgb(self):
         # Pure blue BGR = (255, 0, 0) → RGB R=0, G=0, B=255
@@ -97,7 +97,7 @@ class TestRemoveBackground:
         blue_bgr[:, :, 0] = 255
         svc = SegmentationService(_ConstantMaskSegmentor(make_mask(10, 10, foreground=True)))
         out = svc.remove_background(blue_bgr)
-        assert np.all(out[:, :, 0] == 0)    # R
+        assert np.all(out[:, :, 0] == 0)  # R
         assert np.all(out[:, :, 2] == 255)  # B
 
     def test_raises_on_non_3channel_input(self, all_fg_service):

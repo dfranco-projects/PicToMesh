@@ -24,9 +24,7 @@ class MeshService:
         detail but slower. Produces a watertight mesh.
         """
         pcd = self._ensure_normals(pcd)
-        mesh_o3d, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-            pcd, depth=depth
-        )
+        mesh_o3d, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth)
         return self._to_trimesh(mesh_o3d)
 
     def ball_pivoting(
@@ -73,7 +71,7 @@ class MeshService:
 
     def _compute_radii(self, pcd: o3d.geometry.PointCloud) -> list[float]:
         dists = np.asarray(pcd.compute_nearest_neighbor_distance())
-        dists = dists[dists > 0]   # exclude duplicates (distance == 0)
+        dists = dists[dists > 0]  # exclude duplicates (distance == 0)
         if len(dists) == 0:
             raise ValueError(
                 "Cannot compute BPA radii: all points are duplicates. "

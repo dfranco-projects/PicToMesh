@@ -52,13 +52,22 @@ def poisson_out_of_process(
 ) -> dict:
     """Run one Poisson reconstruction in a fresh interpreter, return its stats."""
     result = subprocess.run(
-        [sys.executable, "-c", _POISSON_SCRIPT, shape, str(n_points), str(depth),
-         "1" if drop_normals else "0"],
+        [
+            sys.executable,
+            "-c",
+            _POISSON_SCRIPT,
+            shape,
+            str(n_points),
+            str(depth),
+            "1" if drop_normals else "0",
+        ],
         capture_output=True,
         text=True,
         timeout=300,
     )
-    assert result.returncode == 0, f"poisson subprocess failed ({result.returncode}): {result.stderr[-2000:]}"
+    assert result.returncode == 0, (
+        f"poisson subprocess failed ({result.returncode}): {result.stderr[-2000:]}"
+    )
     return json.loads(result.stdout.strip().splitlines()[-1])
 
 

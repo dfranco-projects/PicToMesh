@@ -31,9 +31,12 @@ class CameraIntrinsics:
         """Estimate intrinsics assuming a ~60° horizontal FoV (no EXIF available)."""
         fx = fy = float(width)
         return CameraIntrinsics(
-            fx=fx, fy=fy,
-            cx=width / 2.0, cy=height / 2.0,
-            width=width, height=height,
+            fx=fx,
+            fy=fy,
+            cx=width / 2.0,
+            cy=height / 2.0,
+            width=width,
+            height=height,
         )
 
 
@@ -112,12 +115,17 @@ class DepthAnythingEstimator:
         with torch.no_grad():
             outputs = self._model(**inputs)
 
-        depth = torch.nn.functional.interpolate(
-            outputs.predicted_depth.unsqueeze(1),
-            size=(h, w),
-            mode="bicubic",
-            align_corners=False,
-        ).squeeze().cpu().numpy()
+        depth = (
+            torch.nn.functional.interpolate(
+                outputs.predicted_depth.unsqueeze(1),
+                size=(h, w),
+                mode="bicubic",
+                align_corners=False,
+            )
+            .squeeze()
+            .cpu()
+            .numpy()
+        )
 
         d_min, d_max = float(depth.min()), float(depth.max())
         if d_max > d_min:
@@ -192,9 +200,7 @@ class ReconstructionService:
             depth_trunc=depth_trunc,
             convert_rgb_to_intensity=False,
         )
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(
-            rgbd, intrinsics.to_open3d()
-        )
+        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics.to_open3d())
         return pcd
 
     def from_images(

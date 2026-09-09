@@ -21,7 +21,7 @@ def orthogonal_centroid(reference: np.ndarray, seed: int) -> np.ndarray:
     """Return a unit vector orthogonal to *reference*."""
     rng = np.random.default_rng(seed)
     v = rng.standard_normal(DIM).astype(np.float32)
-    v -= np.dot(v, reference) * reference   # Gram-Schmidt
+    v -= np.dot(v, reference) * reference  # Gram-Schmidt
     return unit(v)
 
 
@@ -81,8 +81,8 @@ class TestFilter:
     def test_two_clusters_returns_larger(self):
         c0 = make_centroid(0)
         c1 = orthogonal_centroid(c0, seed=99)
-        large = noisy_cluster(c0, n=6, seed=1)   # indices 0-5
-        small = noisy_cluster(c1, n=3, seed=2)   # indices 6-8
+        large = noisy_cluster(c0, n=6, seed=1)  # indices 0-5
+        small = noisy_cluster(c1, n=3, seed=2)  # indices 6-8
         features = np.vstack([large, small])
         svc = FilteringService(_FixedEncoder(features), similarity_threshold=0.7)
         result = svc.filter(make_images(9))
@@ -91,8 +91,8 @@ class TestFilter:
     def test_two_equal_clusters_returns_one_complete_cluster(self):
         c0 = make_centroid(0)
         c1 = orthogonal_centroid(c0, seed=99)
-        f0 = noisy_cluster(c0, n=4, seed=1)   # indices 0-3
-        f1 = noisy_cluster(c1, n=4, seed=2)   # indices 4-7
+        f0 = noisy_cluster(c0, n=4, seed=1)  # indices 0-3
+        f1 = noisy_cluster(c1, n=4, seed=2)  # indices 4-7
         features = np.vstack([f0, f1])
         svc = FilteringService(_FixedEncoder(features), similarity_threshold=0.7)
         result = svc.filter(make_images(8))

@@ -154,9 +154,11 @@ class TestFromImages:
     @pytest.fixture
     def mock_reconstructor(self, sphere_pcd):
         """Minimal object satisfying MultiViewReconstructor protocol."""
+
         class _Mock:
             def reconstruct(self, images):
                 return sphere_pcd
+
         return _Mock()
 
     def test_returns_point_cloud(self, service, mock_reconstructor):
@@ -166,10 +168,12 @@ class TestFromImages:
 
     def test_passes_images_to_reconstructor(self, service):
         received = []
+
         class _Spy:
             def reconstruct(self, images):
                 received.extend(images)
                 return o3d.geometry.PointCloud()
+
         images = [np.zeros((64, 64, 3), dtype=np.uint8) for _ in range(3)]
         service.from_images(images, _Spy())
         assert len(received) == 3
