@@ -3,7 +3,6 @@ import pytest
 
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService
 
-
 # ── Helpers & fixtures ────────────────────────────────────────────────────────
 
 

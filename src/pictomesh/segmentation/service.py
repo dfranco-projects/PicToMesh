@@ -5,7 +5,6 @@ from typing import Protocol
 import cv2
 import numpy as np
 
-
 # ── Protocol ──────────────────────────────────────────────────────────────────
 
 

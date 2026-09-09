@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 from backend.api.main import app
 from backend.models import JobStatus
 
-
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -43,7 +42,6 @@ def client(fake_arq, tmp_path):
         yield
         await fake_redis.aclose()
 
-    original_router = app.router
     with patch.object(app.router, "lifespan_context", _fake_lifespan):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
@@ -93,7 +91,8 @@ def test_create_job_no_files_returns_422(client):
 
 
 def test_get_job_not_found(client):
-    from arq.jobs import Job, JobStatus as ArqJobStatus
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
 
     with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.not_found)):
         r = client.get("/jobs/nonexistent-id")
@@ -101,7 +100,8 @@ def test_get_job_not_found(client):
 
 
 def test_get_job_queued(client):
-    from arq.jobs import Job, JobStatus as ArqJobStatus
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
 
     with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
         r = client.get("/jobs/some-job-id")
@@ -110,7 +110,8 @@ def test_get_job_queued(client):
 
 
 def test_get_job_complete_has_mesh_url(client):
-    from arq.jobs import Job, JobStatus as ArqJobStatus
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
 
     with (
         patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.complete)),

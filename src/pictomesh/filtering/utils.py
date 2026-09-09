@@ -1,10 +1,11 @@
 import os
+
 from PIL import Image
-from typing import List, Tuple
+
 
 def get_image_paths(
-        folder: str, extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png')
-) -> List[str]:
+        folder: str, extensions: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
+) -> list[str]:
     '''
     Creates a list of image file paths from a folder.
 
@@ -25,7 +26,7 @@ def get_image_paths(
     )   
 
 
-def load_images_from_paths(paths: List[str]) -> List[Image.Image]:
+def load_images_from_paths(paths: list[str]) -> list[Image.Image]:
     '''
     Loads a list of image paths as PIL Image objects ensuring it's in RGB mode.
 

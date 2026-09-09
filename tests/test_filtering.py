@@ -3,7 +3,6 @@ import pytest
 
 from pictomesh.filtering.service import FilteringService
 
-
 # ── Test doubles & helpers ────────────────────────────────────────────────────
 
 DIM = 512  # match CLIP's output dimensionality
@@ -66,7 +65,6 @@ def make_images(n: int) -> list[np.ndarray]:
 
 class TestFilter:
     def test_single_image_returns_index_zero(self):
-        svc = FilteringService(_FixedEncoder(np.ones((1, DIM), dtype=np.float32)))
         assert FilteringService(_SpyEncoder()).filter(make_images(1)) == [0]
 
     def test_two_images_returned_unchanged(self):

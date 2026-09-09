@@ -19,7 +19,6 @@ from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
 from pictomesh.pipeline import Pipeline
 from pictomesh.reconstruction.service import (
-    FlatDepthEstimator,
     ReconstructionService,
 )
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService

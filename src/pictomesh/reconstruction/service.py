@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import open3d as o3d
 
-
 # ── Camera intrinsics ─────────────────────────────────────────────────────────
 
 
@@ -28,7 +27,7 @@ class CameraIntrinsics:
         )
 
     @staticmethod
-    def estimate(width: int, height: int) -> "CameraIntrinsics":
+    def estimate(width: int, height: int) -> CameraIntrinsics:
         """Estimate intrinsics assuming a ~60° horizontal FoV (no EXIF available)."""
         fx = fy = float(width)
         return CameraIntrinsics(
