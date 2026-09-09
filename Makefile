@@ -23,11 +23,11 @@ uninstall:
 # ── Code quality ─────────────────────────────────────────────────────────────
 
 lint:
-	uv run ruff check src/ tests/
+	uv run ruff check src/ tests/ backend/
 
 format:
-	uv run ruff format src/ tests/
-	uv run ruff check --fix src/ tests/
+	uv run ruff format src/ tests/ backend/
+	uv run ruff check --fix src/ tests/ backend/
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
