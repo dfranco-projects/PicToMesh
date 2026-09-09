@@ -186,6 +186,10 @@ media/
 # CLAUDE
 CLAUDE.md
 
+# Corporate CA certificates for docker builds (see README)
+docker/certs/*.crt
+docker/certs/*.pem
+
 # PYTHON
 .python-version
 

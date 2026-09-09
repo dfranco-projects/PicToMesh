@@ -5,6 +5,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
+# Optional corporate CA certificates (e.g. Zscaler): drop *.crt into docker/certs/ (gitignored).
+# UV_SYSTEM_CERTS makes uv trust the system store; the other two cover the model downloads
+# rembg (requests) and huggingface-hub (httpx) do inside the worker.
+COPY docker/certs/ /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+ENV UV_SYSTEM_CERTS=1 \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
 # Native libraries opencv-python and open3d link against at import time.
 # python:3.12-slim ships none of them, so both fail with ImportError without this.
 RUN apt-get update \
