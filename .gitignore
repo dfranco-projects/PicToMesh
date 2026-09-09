@@ -188,3 +188,6 @@ CLAUDE.md
 
 # PYTHON
 .python-version
+
+# agent coordination
+coagent.log
