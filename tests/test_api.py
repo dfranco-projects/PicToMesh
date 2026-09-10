@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 from contextlib import asynccontextmanager
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import fakeredis.aioredis as fake_aioredis
@@ -17,6 +18,7 @@ from arq.connections import ArqRedis
 from fastapi.testclient import TestClient
 
 from backend.api.main import app
+from backend.api.routes.jobs import MAX_FILES, MAX_UPLOAD_BYTES
 from backend.models import JobStatus
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -84,6 +86,72 @@ def test_create_job_enqueues_task(client, fake_arq):
 
 def test_create_job_no_files_returns_422(client):
     r = client.post("/jobs", files=[])
+    assert r.status_code == 422
+
+
+def test_upload_filename_cannot_escape_the_upload_dir(client, fake_arq, tmp_path, monkeypatch):
+    """A traversing multipart filename must not write outside media_dir."""
+    from backend import config
+
+    monkeypatch.setattr(config.settings, "media_dir", tmp_path)
+    escape_target = tmp_path.parent / "escaped.jpg"
+
+    r = client.post(
+        "/jobs",
+        files=[
+            (
+                "files",
+                ("../../escaped.jpg", io.BytesIO(b"\xff\xd8\xff" + b"\x00" * 32), "image/jpeg"),
+            )
+        ],
+    )
+
+    assert r.status_code == 202
+    assert not escape_target.exists()
+    saved = [Path(p) for p in fake_arq.enqueue_job.call_args.args[2]]
+    for path in saved:
+        assert tmp_path in path.resolve().parents
+
+
+def test_upload_keeps_only_allowed_extensions(client, fake_arq, tmp_path, monkeypatch):
+    from backend import config
+
+    monkeypatch.setattr(config.settings, "media_dir", tmp_path)
+    client.post(
+        "/jobs",
+        files=[("files", ("payload.py", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))],
+    )
+    saved = Path(fake_arq.enqueue_job.call_args.args[2][0])
+    assert saved.suffix == ".jpg"
+
+
+def test_create_job_rejects_too_many_files(client):
+    files = [
+        ("files", (f"{i}.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))
+        for i in range(MAX_FILES + 1)
+    ]
+    r = client.post("/jobs", files=files)
+    assert r.status_code == 413
+
+
+def test_create_job_rejects_oversized_file(client, tmp_path, monkeypatch):
+    from backend import config
+
+    monkeypatch.setattr(config.settings, "media_dir", tmp_path)
+    oversized = b"\xff\xd8\xff" + b"\x00" * (MAX_UPLOAD_BYTES + 1)
+    r = client.post(
+        "/jobs",
+        files=[("files", ("big.jpg", io.BytesIO(oversized), "image/jpeg"))],
+    )
+    assert r.status_code == 413
+    assert not any(tmp_path.iterdir())
+
+
+def test_create_job_rejects_unknown_format(client):
+    r = client.post(
+        "/jobs?fmt=exe",
+        files=[("files", ("a.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))],
+    )
     assert r.status_code == 422
 
 
