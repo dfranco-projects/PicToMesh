@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query"
 import { Dropzone } from "@/components/Dropzone"
 import { JobStatus } from "@/components/JobStatus"
 import { Viewer3D } from "@/components/Viewer3D"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -55,9 +56,12 @@ export default function App() {
       {/* ── Left panel ── */}
       <aside className="flex w-[360px] shrink-0 flex-col gap-6 border-r border-border p-6">
         {/* Header */}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">PicToMesh</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Images → 3D mesh</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">PicToMesh</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Images → 3D mesh</p>
+          </div>
+          <ThemeToggle />
         </div>
 
         <Separator />
