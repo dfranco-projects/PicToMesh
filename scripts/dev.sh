@@ -20,7 +20,7 @@ if [ ! -d .venv ]; then
 fi
 
 if ! uv run python -c "import rembg" > /dev/null 2>&1; then
-    echo "Model extras are not installed. Run: uv sync --extra single-image --extra depth" >&2
+    echo "Model extras are not installed. Run: uv sync --extra single-image --extra depth --extra multi-view" >&2
     exit 1
 fi
 
