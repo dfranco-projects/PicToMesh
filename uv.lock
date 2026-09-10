@@ -1641,6 +1641,11 @@ dependencies = [
 depth = [
     { name = "transformers" },
 ]
+multi-view = [
+    { name = "einops" },
+    { name = "huggingface-hub" },
+    { name = "roma" },
+]
 segmentation = [
     { name = "sam-2" },
 ]
@@ -1672,9 +1677,11 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "arq", specifier = ">=0.28.0" },
+    { name = "einops", marker = "extra == 'multi-view'", specifier = ">=0.8.2" },
     { name = "einops", marker = "extra == 'single-image'", specifier = ">=0.8.2" },
     { name = "fastapi", specifier = ">=0.136.0" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "huggingface-hub", marker = "extra == 'multi-view'", specifier = ">=1.11.0" },
     { name = "huggingface-hub", marker = "extra == 'single-image'", specifier = ">=1.11.0" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "omegaconf", marker = "extra == 'single-image'", specifier = ">=2.3.0" },
@@ -1687,6 +1694,7 @@ requires-dist = [
     { name = "pymcubes", marker = "extra == 'single-image'", specifier = ">=0.1.6" },
     { name = "python-multipart", specifier = ">=0.0.26" },
     { name = "rembg", marker = "extra == 'single-image'", specifier = ">=2.0.69" },
+    { name = "roma", marker = "extra == 'multi-view'", specifier = ">=1.6.1" },
     { name = "sam-2", marker = "extra == 'segmentation'", git = "https://github.com/facebookresearch/sam2.git" },
     { name = "scipy", specifier = ">=1.15.3" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.11.0" },
@@ -1699,7 +1707,7 @@ requires-dist = [
     { name = "trimesh", specifier = ">=4.11.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.45.0" },
 ]
-provides-extras = ["single-image", "segmentation", "depth"]
+provides-extras = ["single-image", "segmentation", "depth", "multi-view"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2371,6 +2379,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
+]
+
+[[package]]
+name = "roma"
+version = "1.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/79/bbe3ba78a479f0b6623105480e49de053751e146b97c1e638347ad95a0ee/roma-1.6.1.tar.gz", hash = "sha256:869e534ffd1f5184dd3d03802e546eda6de704ec50c0b19b685f0bea6f2f9904", size = 318338, upload-time = "2026-08-20T13:31:55.581Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/e5/484ff091291cfb9ba82977717ca817456f9a22d519906ec9d16629036360/roma-1.6.1-py3-none-any.whl", hash = "sha256:79c3a07ab94c0e784e8de2ecc878645a5cf0aff312f7b1e281ca1be7c5f0b7e8", size = 25484, upload-time = "2026-08-20T13:31:53.537Z" },
 ]
 
 [[package]]

@@ -40,6 +40,11 @@ segmentation = [
 depth = [
     "transformers>=4.40.0",
 ]
+multi-view = [
+    "einops>=0.8.2",
+    "huggingface-hub>=1.11.0",
+    "roma>=1.6.1",
+]
 
 [dependency-groups]
 dev = [
