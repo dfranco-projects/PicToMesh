@@ -23,7 +23,13 @@ export default function App() {
   const [files, setFiles] = useState<File[]>([])
   const [fmt, setFmt] = useState<"glb" | "obj" | "stl">("glb")
   const [stage, setStage] = useState<Stage>("idle")
+  const [error, setError] = useState<string | null>(null)
   const { jobId, meshUrl, setJobId, setMeshUrl, reset } = useStore()
+
+  function fail(reason?: string | null) {
+    setError(reason?.trim() || null)
+    setStage("error")
+  }
 
   const { mutate: startJob, isPending } = useMutation({
     mutationFn: () => submitJob(files, fmt),
@@ -31,7 +37,7 @@ export default function App() {
       setJobId(data.job_id)
       setStage("processing")
     },
-    onError: () => setStage("error"),
+    onError: (e: Error) => fail(e.message),
   })
 
   function handleComplete(result: JobResult) {
@@ -39,13 +45,16 @@ export default function App() {
       setMeshUrl(result.mesh_url)
       setStage("done")
     } else {
-      setStage("error")
+      // The worker's reason reaches us here; JobStatus unmounts on error, so
+      // without keeping it the user only ever sees a generic failure.
+      fail(result.error)
     }
   }
 
   function handleReset() {
     reset()
     setFiles([])
+    setError(null)
     setStage("idle")
   }
 
@@ -100,7 +109,12 @@ export default function App() {
         )}
 
         {stage === "error" && (
-          <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+            {error && (
+              <p className="text-xs text-muted-foreground break-words">{error}</p>
+            )}
+          </div>
         )}
 
         {/* Actions */}
