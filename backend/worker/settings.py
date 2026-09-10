@@ -9,4 +9,4 @@ class WorkerSettings:
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     max_jobs = 4
-    job_timeout = 600  # 10 min
+    job_timeout = 1800  # 30 min: multi-view on CPU takes minutes for a handful of photos

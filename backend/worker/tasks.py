@@ -10,6 +10,7 @@ from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
 from pictomesh.mesh.triposr import TripoSRReconstructor
 from pictomesh.pipeline import Pipeline
+from pictomesh.reconstruction.dust3r import Dust3rReconstructor
 from pictomesh.reconstruction.service import (
     DepthAnythingEstimator,
     FlatDepthEstimator,
@@ -53,12 +54,17 @@ def _build_pipeline() -> Pipeline:
         single = TripoSRReconstructor()
     except ImportError:
         single = None
+    try:
+        multi = Dust3rReconstructor()
+    except ImportError:
+        multi = None
     return Pipeline(
         seg,
         flt,
         rec,
         msh,
         dep,
+        reconstructor=multi,
         image_threshold=settings.image_threshold,
         single_image_reconstructor=single,
     )

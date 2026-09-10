@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import cv2
 import numpy as np
 import open3d as o3d
 
@@ -33,7 +32,7 @@ class Pipeline:
     Routing logic:
       < image_threshold images   →  single-image model (TripoSR) on the first image, if provided
                                      else depth-lift each image → BPA mesh
-      >= image_threshold images  →  MASt3R multi-view (if reconstructor provided) → Poisson mesh
+      >= image_threshold images  →  multi-view model (DUSt3R) on the photos → Poisson mesh
                                      else same as below threshold
     """
 
@@ -45,7 +44,7 @@ class Pipeline:
         mesh: MeshService,
         depth_estimator: DepthEstimator,
         reconstructor: MultiViewReconstructor | None = None,
-        image_threshold: int = 5,
+        image_threshold: int = 2,
         single_image_reconstructor: SingleImageReconstructor | None = None,
     ) -> None:
         self._segmentation = segmentation
@@ -108,8 +107,9 @@ class Pipeline:
         self, images: list[np.ndarray], segmented: list[np.ndarray]
     ) -> o3d.geometry.PointCloud:
         if len(images) >= self._image_threshold and self._reconstructor is not None:
-            bgr = [self._rgba_to_bgr(img) for img in segmented]
-            return self._reconstruction.from_images(bgr, self._reconstructor)
+            # The model needs the photo context; the cutouts only supply the subject masks.
+            masks = [rgba[:, :, 3] > 0 for rgba in segmented]
+            return self._reconstruction.from_images(images, self._reconstructor, masks)
 
         clouds = []
         for img, rgba in zip(images, segmented):
@@ -120,10 +120,6 @@ class Pipeline:
             depth = self._fit_depth_to_subject(depth, rgba, intr)
             clouds.append(self._reconstruction.from_depth(depth, intr))
         return self._merge_clouds(clouds)
-
-    @staticmethod
-    def _rgba_to_bgr(img: np.ndarray) -> np.ndarray:
-        return cv2.cvtColor(img[:, :, :3], cv2.COLOR_RGB2BGR)
 
     @staticmethod
     def _fit_depth_to_subject(

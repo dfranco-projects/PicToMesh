@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # Pipeline
-    image_threshold: int = 5
+    image_threshold: int = 2
 
 
 settings = Settings()
