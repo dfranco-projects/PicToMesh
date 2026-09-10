@@ -230,6 +230,57 @@ def test_get_job_raising_result_returns_failed(client):
     assert "task exploded" in body["error"]
 
 
+# ── GET /jobs/{id}/stream ─────────────────────────────────────────────────────
+
+
+def test_stream_unknown_job_returns_404(client):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.not_found)):
+        r = client.get("/jobs/nope/stream")
+    assert r.status_code == 404
+
+
+def test_stream_closes_immediately_when_job_already_finished(client):
+    """Nothing more gets published for a finished job, so the stream must not wait."""
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    with (
+        patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.complete)),
+        patch.object(
+            Job,
+            "result",
+            new=AsyncMock(return_value={"status": "complete", "mesh_url": "/meshes/abc/mesh.glb"}),
+        ),
+    ):
+        r = client.get("/jobs/abc/stream")
+
+    assert r.status_code == 200
+    assert "complete" in r.text
+    assert r.text.startswith("data: ")
+
+
+def test_stream_reports_failure_reason_for_finished_job(client):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    with (
+        patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.complete)),
+        patch.object(
+            Job,
+            "result",
+            new=AsyncMock(return_value={"status": "failed", "error": "no readable images"}),
+        ),
+    ):
+        r = client.get("/jobs/abc/stream")
+
+    assert r.status_code == 200
+    assert "no readable images" in r.text
+    assert "failed" in r.text
+
+
 # ── GET /meshes/{job_id}/{filename} ───────────────────────────────────────────
 
 
