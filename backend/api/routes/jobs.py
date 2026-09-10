@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
+from pathlib import Path
+from typing import Literal
 
 import aiofiles
 from arq import ArqRedis
@@ -15,8 +18,45 @@ from backend.models import JobResponse, JobResult, JobStatus
 
 router = APIRouter()
 
+MAX_FILES = 50
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # per file
+_CHUNK = 1024 * 1024
+_ALLOWED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _upload_name(index: int, filename: str | None) -> str:
+    """Build the on-disk name ourselves.
+
+    The multipart filename is attacker controlled: a value like
+    ``../../../../etc/cron.d/x`` would otherwise escape the upload directory and
+    write anywhere the API process can reach. Only the extension is taken from
+    the client, and only if it is one we accept.
+    """
+    suffix = Path(filename or "").suffix.lower()
+    if suffix not in _ALLOWED_SUFFIXES:
+        suffix = ".jpg"
+    return f"{index:03d}{suffix}"
+
+
+async def _save_upload(file: UploadFile, dest: Path) -> None:
+    """Stream *file* to *dest*, rejecting anything over MAX_UPLOAD_BYTES.
+
+    Streamed rather than read() in one go so a large upload cannot be buffered
+    into memory before the size is known.
+    """
+    written = 0
+    async with aiofiles.open(dest, "wb") as out:
+        while chunk := await file.read(_CHUNK):
+            written += len(chunk)
+            if written > MAX_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Each file must be under {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+                )
+            await out.write(chunk)
 
 
 def _arq_to_job_status(arq_status: ArqJobStatus) -> JobStatus:
@@ -35,21 +75,27 @@ def _arq_to_job_status(arq_status: ArqJobStatus) -> JobStatus:
 async def create_job(
     request: Request,
     files: list[UploadFile],
-    fmt: str = "glb",
+    fmt: Literal["glb", "obj", "stl"] = "glb",
 ) -> JobResponse:
     if not files:
         raise HTTPException(status_code=422, detail="At least one file is required.")
+    if len(files) > MAX_FILES:
+        raise HTTPException(status_code=413, detail=f"At most {MAX_FILES} files per job.")
 
     job_id = str(uuid.uuid4())
-    upload_dir = settings.media_dir / job_id / "uploads"
+    job_dir = settings.media_dir / job_id
+    upload_dir = job_dir / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     saved_paths: list[str] = []
-    for file in files:
-        dest = upload_dir / (file.filename or f"{uuid.uuid4()}.jpg")
-        async with aiofiles.open(dest, "wb") as f:
-            await f.write(await file.read())
-        saved_paths.append(str(dest))
+    try:
+        for index, file in enumerate(files):
+            dest = upload_dir / _upload_name(index, file.filename)
+            await _save_upload(file, dest)
+            saved_paths.append(str(dest))
+    except Exception:
+        shutil.rmtree(job_dir, ignore_errors=True)
+        raise
 
     arq: ArqRedis = request.app.state.arq
     await arq.enqueue_job("process_images", job_id, saved_paths, fmt, _job_id=job_id)
