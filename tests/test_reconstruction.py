@@ -156,7 +156,7 @@ class TestFromImages:
         """Minimal object satisfying MultiViewReconstructor protocol."""
 
         class _Mock:
-            def reconstruct(self, images):
+            def reconstruct(self, images, masks=None):
                 return sphere_pcd
 
         return _Mock()
@@ -170,7 +170,7 @@ class TestFromImages:
         received = []
 
         class _Spy:
-            def reconstruct(self, images):
+            def reconstruct(self, images, masks=None):
                 received.extend(images)
                 return o3d.geometry.PointCloud()
 

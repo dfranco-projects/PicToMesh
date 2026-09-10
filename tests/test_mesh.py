@@ -1,3 +1,4 @@
+import numpy as np
 import open3d as o3d
 import pytest
 import trimesh
@@ -100,3 +101,21 @@ class TestExport:
     def test_default_format_is_glb(self, service, bpa_sphere_mesh, tmp_path):
         out = service.export(bpa_sphere_mesh, tmp_path / "mesh")
         assert out.suffix == ".glb"
+
+
+def test_poisson_keeps_vertex_colours(service, sphere_pcd):
+    coloured = o3d.geometry.PointCloud(sphere_pcd)
+    coloured.colors = o3d.utility.Vector3dVector(
+        np.tile([0.2, 0.6, 0.9], (len(coloured.points), 1))
+    )
+    mesh = service.poisson(coloured, depth=6)
+    colors = np.asarray(mesh.visual.vertex_colors)
+    assert colors.shape == (len(mesh.vertices), 4)
+    np.testing.assert_allclose(colors[:, :3].mean(axis=0), [51, 153, 229.5], atol=4)
+
+
+def test_poisson_drops_debris(service, sphere_pcd):
+    debris = o3d.geometry.PointCloud(sphere_pcd).random_down_sample(0.01)
+    debris.translate((8.0, 0.0, 0.0))
+    mesh = service.poisson(sphere_pcd + debris, depth=6)
+    assert mesh.body_count == 1

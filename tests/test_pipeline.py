@@ -84,7 +84,7 @@ class _Reconstruction:
         self.depth_calls += 1
         return _tiny_pcd()
 
-    def from_images(self, images, reconstructor):
+    def from_images(self, images, reconstructor, masks=None):
         self.multi_calls += 1
         return _tiny_pcd()
 
@@ -117,7 +117,7 @@ class _DepthEstimator:
 
 
 class _Reconstructor:
-    def reconstruct(self, images):
+    def reconstruct(self, images, masks=None):
         return _tiny_pcd()
 
 
@@ -295,6 +295,24 @@ class TestSingleImageRouting:
         assert out.exists()
 
 
+class TestMultiViewInputs:
+    class _RecordingReconstruction(_Reconstruction):
+        def from_images(self, images, reconstructor, masks=None):
+            self.images, self.masks = images, masks
+            return super().from_images(images, reconstructor, masks)
+
+    def test_multiview_gets_photos_and_subject_masks(self, tmp_path):
+        rec = self._RecordingReconstruction()
+        p, *_ = _make_pipeline(
+            reconstruction=rec, reconstructor=_Reconstructor(), image_threshold=2
+        )
+        photos = [np.full((8, 8, 3), 200, dtype=np.uint8) for _ in range(2)]
+        p.run(photos, tmp_path / "out")
+        assert all((img == 200).all() for img in rec.images)  # originals, not cutouts
+        assert len(rec.masks) == 2
+        assert rec.masks[0].dtype == bool and rec.masks[0].shape == (8, 8)
+
+
 class TestOrientation:
     class _PointReconstruction:
         """Returns a single known camera-frame point (x right, y down, z forward)."""
@@ -304,7 +322,7 @@ class TestOrientation:
             pcd.points = o3d.utility.Vector3dVector(np.array([[0.1, 0.2, 2.0]]))
             return pcd
 
-        def from_images(self, images, reconstructor):
+        def from_images(self, images, reconstructor, masks=None):
             return self.from_depth(None, None)
 
     class _RecordingMesh(_Mesh):
@@ -334,7 +352,7 @@ class TestDepthFitting:
             self.depths.append(depth)
             return _tiny_pcd()
 
-        def from_images(self, images, reconstructor):
+        def from_images(self, images, reconstructor, masks=None):
             return _tiny_pcd()
 
     class _HalfMaskSegmentation:
