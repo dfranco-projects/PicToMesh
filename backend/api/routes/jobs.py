@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -14,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from backend.config import settings
-from backend.models import JobResponse, JobResult, JobStatus
+from backend.models import JobResponse, JobResult, JobStatus, ProgressEvent
 
 router = APIRouter()
 
@@ -23,18 +24,18 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # per file
 _CHUNK = 1024 * 1024
 _ALLOWED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
+_TERMINAL = (JobStatus.complete, JobStatus.failed)
+
+SSE_POLL_SECONDS = 1.0
+SSE_HEARTBEAT_SECONDS = 15.0
+SSE_MAX_SECONDS = 1860.0  # just over the worker's job_timeout
+
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
 def _upload_name(index: int, filename: str | None) -> str:
-    """Build the on-disk name ourselves.
-
-    The multipart filename is attacker controlled: a value like
-    ``../../../../etc/cron.d/x`` would otherwise escape the upload directory and
-    write anywhere the API process can reach. Only the extension is taken from
-    the client, and only if it is one we accept.
-    """
+    """Name the file ourselves — the client's filename can traverse out of the dir."""
     suffix = Path(filename or "").suffix.lower()
     if suffix not in _ALLOWED_SUFFIXES:
         suffix = ".jpg"
@@ -42,11 +43,7 @@ def _upload_name(index: int, filename: str | None) -> str:
 
 
 async def _save_upload(file: UploadFile, dest: Path) -> None:
-    """Stream *file* to *dest*, rejecting anything over MAX_UPLOAD_BYTES.
-
-    Streamed rather than read() in one go so a large upload cannot be buffered
-    into memory before the size is known.
-    """
+    """Stream *file* to *dest*, rejecting anything over MAX_UPLOAD_BYTES."""
     written = 0
     async with aiofiles.open(dest, "wb") as out:
         while chunk := await file.read(_CHUNK):
@@ -66,6 +63,53 @@ def _arq_to_job_status(arq_status: ArqJobStatus) -> JobStatus:
         ArqJobStatus.complete: JobStatus.complete,
         ArqJobStatus.deferred: JobStatus.queued,
     }.get(arq_status, JobStatus.failed)
+
+
+def _is_terminal(data: str) -> bool:
+    """True if a published progress payload says the job is over."""
+    try:
+        return json.loads(data).get("status") in _TERMINAL
+    except (TypeError, ValueError, AttributeError):
+        return False
+
+
+async def _job_result(job_id: str, arq: ArqRedis) -> JobResult | None:
+    """Current state of *job_id*, or None if arq has never heard of it."""
+    job = Job(job_id, arq)
+    arq_status = await job.status()
+    if arq_status == ArqJobStatus.not_found:
+        return None
+
+    job_status = _arq_to_job_status(arq_status)
+    mesh_url: str | None = None
+    error: str | None = None
+
+    if arq_status == ArqJobStatus.complete:
+        try:
+            result = await job.result()
+        except Exception as e:
+            return JobResult(job_id=job_id, status=JobStatus.failed, error=str(e))
+        if isinstance(result, dict):
+            mesh_url = result.get("mesh_url")
+            error = result.get("error")
+            if error:
+                job_status = JobStatus.failed
+
+    return JobResult(job_id=job_id, status=job_status, mesh_url=mesh_url, error=error)
+
+
+async def _terminal_event(job_id: str, arq: ArqRedis) -> ProgressEvent | None:
+    """A synthesised final event if the job is already over, else None."""
+    result = await _job_result(job_id, arq)
+    if result is None or result.status not in _TERMINAL:
+        return None
+    failed = result.status == JobStatus.failed
+    return ProgressEvent(
+        job_id=job_id,
+        status=result.status,
+        message=result.error or ("Processing failed" if failed else "Done"),
+        progress=0.0 if failed else 1.0,
+    )
 
 
 # ── routes ────────────────────────────────────────────────────────────────────
@@ -105,49 +149,51 @@ async def create_job(
 
 @router.get("/{job_id}", response_model=JobResult)
 async def get_job(job_id: str, request: Request) -> JobResult:
-    arq: ArqRedis = request.app.state.arq
-    job = Job(job_id, arq)
-    arq_status = await job.status()
-
-    if arq_status == ArqJobStatus.not_found:
+    result = await _job_result(job_id, request.app.state.arq)
+    if result is None:
         raise HTTPException(status_code=404, detail="Job not found.")
-
-    job_status = _arq_to_job_status(arq_status)
-    mesh_url: str | None = None
-    error: str | None = None
-
-    if arq_status == ArqJobStatus.complete:
-        try:
-            result = await job.result()
-        except Exception as e:
-            return JobResult(job_id=job_id, status=JobStatus.failed, error=str(e))
-        if isinstance(result, dict):
-            mesh_url = result.get("mesh_url")
-            error = result.get("error")
-            if error:
-                job_status = JobStatus.failed
-
-    return JobResult(job_id=job_id, status=job_status, mesh_url=mesh_url, error=error)
+    return result
 
 
 @router.get("/{job_id}/stream")
 async def stream_job(job_id: str, request: Request) -> StreamingResponse:
     """SSE endpoint — streams progress events published by the ARQ task."""
     redis = request.app.state.redis
+    arq: ArqRedis = request.app.state.arq
     channel = f"job:{job_id}:progress"
+
+    if await _job_result(job_id, arq) is None:
+        raise HTTPException(status_code=404, detail="Job not found.")
 
     async def event_generator():
         pubsub = redis.pubsub()
         await pubsub.subscribe(channel)
+        started = last_beat = time.monotonic()
         try:
-            async for message in pubsub.listen():
-                if message["type"] != "message":
+            # Subscribed first, so this only has to catch a job that finished earlier.
+            settled = await _terminal_event(job_id, arq)
+            if settled is not None:
+                yield f"data: {settled.model_dump_json()}\n\n"
+                return
+
+            while True:
+                now = time.monotonic()
+                if now - started > SSE_MAX_SECONDS or await request.is_disconnected():
+                    return
+
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=SSE_POLL_SECONDS
+                )
+                if message is None:
+                    if now - last_beat >= SSE_HEARTBEAT_SECONDS:
+                        last_beat = now
+                        yield ": keepalive\n\n"
                     continue
+
                 data = message["data"]
                 yield f"data: {data}\n\n"
-                parsed = json.loads(data)
-                if parsed.get("status") in (JobStatus.complete, JobStatus.failed):
-                    break
+                if _is_terminal(data):
+                    return
         finally:
             await pubsub.unsubscribe(channel)
             await pubsub.aclose()
