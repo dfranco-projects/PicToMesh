@@ -18,7 +18,10 @@ def manager() -> ImageManager:
 
 class TestInit:
     def test_discovers_images(self, manager):
-        assert len(manager.image_paths) == 5
+        assert len(manager.image_paths) == 4
+
+    def test_discovers_liberty_set(self):
+        assert len(ImageManager(ASSETS / "liberty").image_paths) == 5
 
     def test_paths_are_sorted(self, manager):
         names = [p.name for p in manager.image_paths]
@@ -57,7 +60,7 @@ class TestInit:
 class TestLoadImages:
     def test_loads_all_images(self, manager):
         manager.load_images()
-        assert len(manager.get_images()) == 5
+        assert len(manager.get_images()) == 4
 
     def test_images_are_numpy_arrays(self, manager):
         manager.load_images()
@@ -97,7 +100,7 @@ class TestLoadImages:
     def test_calling_twice_resets_data(self, manager):
         manager.load_images()
         manager.load_images()
-        assert len(manager.get_images()) == 5
+        assert len(manager.get_images()) == 4
 
     def test_images_empty_before_load(self):
         mgr = ImageManager(ASSETS)
