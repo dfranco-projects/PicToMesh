@@ -56,10 +56,18 @@ class DepthEstimator(Protocol):
 
 
 class MultiViewReconstructor(Protocol):
-    """Implemented by MASt3R (or any future neural SfM backend)."""
+    """Implemented by DUSt3R (or any future neural SfM backend)."""
 
-    def reconstruct(self, images: list[np.ndarray]) -> o3d.geometry.PointCloud:
-        """Return a dense point cloud from a set of unposed RGB images."""
+    def reconstruct(
+        self, images: list[np.ndarray], masks: list[np.ndarray] | None = None
+    ) -> o3d.geometry.PointCloud:
+        """Return a dense point cloud from a set of unposed BGR images.
+
+        Args:
+            images: H×W×3 BGR uint8 photos of the same object from different viewpoints.
+            masks:  Optional H×W boolean subject masks, one per image; background points
+                    are dropped when given.
+        """
         ...
 
 
@@ -207,15 +215,17 @@ class ReconstructionService:
         self,
         images: list[np.ndarray],
         reconstructor: MultiViewReconstructor,
+        masks: list[np.ndarray] | None = None,
     ) -> o3d.geometry.PointCloud:
-        """Multi-view reconstruction via an injected reconstructor (e.g. MASt3R).
+        """Multi-view reconstruction via an injected reconstructor (e.g. DUSt3R).
 
         Args:
             images:        List of H×W×3 BGR images from different viewpoints.
             reconstructor: Any object satisfying MultiViewReconstructor protocol.
+            masks:         Optional per-image boolean subject masks, passed through.
         """
         if len(images) < 2:
             raise ValueError(
                 f"Multi-view reconstruction requires at least 2 images, got {len(images)}."
             )
-        return reconstructor.reconstruct(images)
+        return reconstructor.reconstruct(images, masks)

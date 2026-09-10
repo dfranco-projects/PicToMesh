@@ -7,6 +7,8 @@ from typing import Protocol
 import numpy as np
 import trimesh
 
+from pictomesh.device import default_device
+
 # TripoSR meshes are z-up with the input view looking along -x (camera on +x).
 # glTF is y-up and the viewer camera sits on +z, so the pictured side must face +z:
 # rotate -90° about x, then -90° about y.
@@ -69,7 +71,7 @@ class TripoSRReconstructor:
                 "TripoSR dependencies are missing. Install with: uv sync --extra single-image"
             ) from e
 
-        self._device = device or _default_device()
+        self._device = device or default_device()
         self._model = TSR.from_pretrained(
             model, config_name="config.yaml", weight_name="model.ckpt"
         )
@@ -88,13 +90,3 @@ class TripoSRReconstructor:
             )[0]
         mesh.apply_transform(TRIPOSR_TO_GLTF)
         return mesh
-
-
-def _default_device() -> str:
-    import torch
-
-    if torch.cuda.is_available():
-        return "cuda"
-    if torch.backends.mps.is_available():
-        return "mps"
-    return "cpu"
