@@ -46,7 +46,7 @@ export function Dropzone({ onFiles, disabled }: Props) {
         <p className="text-xs text-muted-foreground">
           or <span className="text-primary underline underline-offset-2">browse files</span>
         </p>
-        <p className="text-xs text-muted-foreground">JPG, PNG, WEBP · multiple views recommended</p>
+        <p className="text-xs text-muted-foreground">JPG, PNG, WEBP · one object per photo</p>
       </div>
 
       {acceptedFiles.length > 0 && (

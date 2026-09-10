@@ -68,6 +68,12 @@ export default function App() {
 
         {/* Dropzone */}
         <Dropzone onFiles={setFiles} disabled={stage !== "idle"} />
+        <p className="text-xs text-muted-foreground -mt-3">
+          Best results: one object on a plain background, shot from a three-quarter angle and
+          filling the frame.
+          {files.length > 1 &&
+            " Only one photo drives the mesh for now; the others are used to spot outliers, so keep them to the same object."}
+        </p>
 
         {/* Format picker */}
         <div className="flex items-center gap-3">
