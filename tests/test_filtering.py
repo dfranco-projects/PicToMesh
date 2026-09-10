@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from pictomesh.filtering.service import FilteringService
+
+ASSETS = Path(__file__).parent / "assets"
 
 # ── Test doubles & helpers ────────────────────────────────────────────────────
 
@@ -173,3 +177,21 @@ class TestSimilarityMatrix:
         mat = svc.similarity_matrix(make_images(8))
         assert np.all(mat >= -1.0)
         assert np.all(mat <= 1.0)
+
+
+# ── E2E test (slow) ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.slow
+class TestFilterE2E:
+    """Real CLIP features: five views of one monument keep each other, a cat is dropped."""
+
+    def test_outlier_removed_from_liberty_set(self):
+        import cv2
+
+        from pictomesh.filtering.clip_encoder import CLIPEncoder
+
+        paths = sorted((ASSETS / "liberty").glob("liberty_*.jpeg")) + [ASSETS / "cat_1.jpeg"]
+        images = [cv2.resize(cv2.imread(str(p)), (224, 224)) for p in paths]
+        keep = FilteringService(CLIPEncoder()).filter(images)
+        assert keep == [0, 1, 2, 3, 4]

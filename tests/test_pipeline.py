@@ -459,3 +459,16 @@ class TestPipelineE2E:
     def test_single_image_runs_without_error(self, pipeline, chair_images, tmp_path):
         out = pipeline.run(chair_images[:1], tmp_path / "single", fmt="glb")
         assert out.exists()
+
+    @pytest.fixture(scope="class")
+    def liberty_images(self) -> list[np.ndarray]:
+        import cv2
+
+        paths = sorted((ASSETS / "liberty").glob("liberty_*.jpeg"))
+        return [cv2.resize(cv2.imread(str(p)), (64, 64)) for p in paths]
+
+    def test_five_images_run_without_error(self, pipeline, liberty_images, tmp_path):
+        assert len(liberty_images) == 5  # at the default image_threshold
+        out = pipeline.run(liberty_images, tmp_path / "liberty", fmt="glb")
+        assert out.exists()
+        assert out.stat().st_size > 0
