@@ -141,7 +141,7 @@ Open `http://localhost:3000`. The API is at `http://localhost:8000`.
 
 A `.env` file is optional. Defaults work out of the box; copy `.env.example` to `.env` only if you want to override them.
 
-The worker downloads model weights on its first start (about 2.5 GB across TripoSR, CLIP, Depth Anything v2 and rembg) and keeps them in the `model_cache` volume, so rebuilds and restarts do not fetch them again.
+The worker downloads model weights on its first start (about 5 GB across TripoSR, DUSt3R, CLIP, Depth Anything v2 and rembg) and keeps them in the `model_cache` volume, so rebuilds and restarts do not fetch them again.
 
 Behind a corporate TLS proxy such as Zscaler the builds fail inside the containers with certificate errors (`uv` prints a hint about `--system-certs`). Drop your root CA as `docker/certs/<name>.crt` before building: both images install everything in that folder into their system trust store, and the folder is gitignored.
 
@@ -163,7 +163,7 @@ Then:
 git clone https://github.com/dfranco-projects/PicToMesh.git
 cd PicToMesh
 make install                                  # create .venv, sync deps, install git hooks
-uv sync --extra single-image --extra depth    # model deps (rembg, Depth Anything v2)
+uv sync --extra single-image --extra depth --extra multi-view   # rembg, TripoSR, Depth Anything v2, DUSt3R
 make dev                                      # starts redis, api, worker, frontend
 ```
 
@@ -173,7 +173,11 @@ Prefer separate terminals? Run `make api`, `make worker`, and `make web` individ
 
 If port 8000 is already taken, pick another one with `API_PORT=8010 make dev`; the Vite proxy follows automatically.
 
-The worker downloads model weights on its first start (TripoSR ~1.7 GB, plus CLIP, Depth Anything v2 Small and u2net), so that start is slow once; later runs reuse the cache.
+The worker downloads model weights on its first start (TripoSR ~1.7 GB, DUSt3R ~2.4 GB, plus CLIP, Depth Anything v2 Small and u2net), so that start is slow once; later runs reuse the cache.
+
+### Model licences
+
+PicToMesh itself is MIT. Two vendored models carry their own terms: TripoSR is MIT, DUSt3R is CC BY-NC-SA 4.0, non-commercial use only. Installing the `multi-view` extra therefore limits that deployment to non-commercial use.
 
 Commits run `ruff check --fix` and `ruff format` through pre-commit. If a hook rewrites a file or an unfixable lint error remains, the commit is rejected: re-stage and commit again. A commit-msg hook also rejects `Co-Authored-By: Claude` trailers.
 

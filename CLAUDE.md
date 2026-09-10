@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What This Project Is
 
 **PicToMesh** converts images into downloadable 3D meshes (GLB, OBJ, STL). Pipeline:
-1. Upload → 2. SAM2 background removal → 3a. TripoSR (1–4 images) or 3b. MASt3R + Open3D Poisson (5+ images) → 4. SSE progress stream → 5. React Three Fiber viewer + download.
+1. Upload → 2. SAM2 background removal → 3a. TripoSR (1 image) or 3b. DUSt3R + Open3D Poisson (2+ images) → 4. SSE progress stream → 5. React Three Fiber viewer + download.
 
 Jobs run asynchronously via ARQ (Redis-backed queue). The browser polls job status and streams progress via SSE.
 
@@ -17,7 +17,7 @@ Jobs run asynchronously via ARQ (Redis-backed queue). The browser polls job stat
 - **PyTorch** — ML runtime, auto-detects MPS / CUDA / CPU
 - **SAM2** — background removal
 - **TripoSR** — feed-forward single-image → mesh
-- **MASt3R** — neural SfM for multi-image (no camera calibration)
+- **DUSt3R** — neural SfM for multi-image (no camera calibration); vendored, CC BY-NC-SA 4.0 (non-commercial)
 - **Depth Anything v2** — monocular depth fallback for CPU
 - **Open3D + trimesh** — point cloud processing and mesh I/O
 
@@ -55,7 +55,7 @@ src/pictomesh/             ML logic (imported by worker tasks)
   image_io/manager.py      ImageManager: load images from folder
   filtering/               CLIP encoder + Louvain outlier detection
   segmentation/            SAM2 wrapper (to implement)
-  reconstruction/          MASt3R + Depth Anything fallback (to implement)
+  reconstruction/          DUSt3R (vendored under _vendor/dust3r) + Depth Anything fallback
   mesh/                    TripoSR (vendored under _vendor/tsr) + Open3D Poisson/BPA
 
 frontend/src/
@@ -73,9 +73,11 @@ All modules are fully implemented. Notable callouts:
 - `src/pictomesh/filtering/clip_encoder.py` — `CLIP.encode_images()` → `{name: feature_vector}`; has dead code after `return` (unreachable similarity block)
 - `src/pictomesh/reconstruction/service.py` — `ReconstructionService`: `from_depth`, `from_rgbd`, `from_images`; `FlatDepthEstimator` (constant-depth fallback); `CameraIntrinsics.estimate` (60° FoV heuristic)
 - `src/pictomesh/segmentation/service.py` — `SegmentationService` + `RembgSegmentor` (u2net, requires `--extra single-image`)
+- `src/pictomesh/reconstruction/dust3r.py` — `Dust3rReconstructor`: 2+ photos + subject masks → coloured cloud in the first camera's frame, unit scale; `prepare_view` mirrors upstream load_images
+- `src/pictomesh/_vendor/dust3r/`, `_vendor/croco/` — vendored DUSt3R (CC BY-NC-SA 4.0, non-commercial); patches listed in `_vendor/dust3r/__init__.py`
 - `src/pictomesh/mesh/triposr.py` — `TripoSRReconstructor`: single RGBA image → vertex-coloured, y-up mesh; `prepare_image` mirrors upstream preprocessing
 - `src/pictomesh/_vendor/tsr/` — vendored TripoSR (MIT) with PyMCubes marching cubes; excluded from ruff; local patches listed in its `__init__.py`
-- `src/pictomesh/pipeline.py` — routes: < `image_threshold` images → TripoSR on the first image (depth-lift + BPA if not installed); ≥ threshold → MASt3R Poisson if provided, else the same. Clouds are rotated from the OpenCV camera frame to glTF y-up before meshing
+- `src/pictomesh/pipeline.py` — routes: < `image_threshold` (default 2) images → TripoSR on the first image (depth-lift + BPA if not installed); ≥ threshold → DUSt3R on the photos + Poisson (density-trimmed, coloured) if installed, else the same as below. Clouds are rotated from the OpenCV camera frame to glTF y-up before meshing
 
 ## Rollout Plan
 
@@ -154,9 +156,10 @@ uv add --optional <group> <package>     # optional group (single-image, segmenta
 uv sync --extra single-image    # rembg + TripoSR deps (einops, omegaconf, huggingface-hub, pymcubes, transformers)
 uv sync --extra segmentation    # SAM2
 uv sync --extra depth           # Depth Anything v2 (transformers)
+uv sync --extra multi-view      # DUSt3R (roma, einops, huggingface-hub); CC BY-NC-SA 4.0, non-commercial
 ```
 
-The worker's default pipeline needs `single-image` (rembg segmentor + TripoSR, ~1.7 GB of weights downloaded on first start) and uses `depth` when present, falling back to FlatDepthEstimator otherwise. The Docker image installs both.
+The worker's default pipeline needs `single-image` (rembg segmentor + TripoSR, ~1.7 GB of weights downloaded on first start), uses `multi-view` (DUSt3R, ~2.4 GB) for two or more photos when present, and uses `depth` when present, falling back to FlatDepthEstimator otherwise. The Docker image installs all three. After any `uv add`/`uv remove`, re-run `uv sync` with the extras: uv strips them from the venv otherwise.
 
 ## Python version
 
