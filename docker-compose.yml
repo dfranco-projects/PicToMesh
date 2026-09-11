@@ -10,7 +10,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.dockerfile
-    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --log-config backend/log_config.json
     env_file:
       - path: .env
         required: false
@@ -29,7 +29,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.dockerfile
-    command: arq backend.worker.settings.WorkerSettings
+    command: arq backend.worker.settings.WorkerSettings --custom-log-dict backend.log_config.LOG_CONFIG
     env_file:
       - path: .env
         required: false

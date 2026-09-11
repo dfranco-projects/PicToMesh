@@ -44,10 +44,10 @@ API_PORT ?= 8000
 EXTRAS := --extra single-image --extra depth --extra multi-view
 
 api:
-	uv run uvicorn backend.api.main:app --reload --port $(API_PORT)
+	uv run uvicorn backend.api.main:app --reload --port $(API_PORT) --log-config backend/log_config.json
 
 worker:
-	uv run arq backend.worker.settings.WorkerSettings
+	uv run arq backend.worker.settings.WorkerSettings --custom-log-dict backend.log_config.LOG_CONFIG
 
 web:
 	@test -d frontend/node_modules || (cd frontend && npm install)

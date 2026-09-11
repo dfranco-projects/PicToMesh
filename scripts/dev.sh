@@ -53,10 +53,10 @@ if [ ! -d frontend/node_modules ]; then
     (cd frontend && npm install)
 fi
 
-uv run uvicorn backend.api.main:app --reload --port "${API_PORT}" &
+uv run uvicorn backend.api.main:app --reload --port "${API_PORT}" --log-config backend/log_config.json &
 pids+=("$!")
 
-uv run arq backend.worker.settings.WorkerSettings &
+uv run arq backend.worker.settings.WorkerSettings --custom-log-dict backend.log_config.LOG_CONFIG &
 pids+=("$!")
 
 (cd frontend && npm run dev) &
