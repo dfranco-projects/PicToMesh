@@ -4,7 +4,7 @@
 # Redis + FastAPI (:8000) + ARQ worker + Vite dev server (:3000).
 #
 # Usage:
-#   make dev                 # idiomatic shortcut
+#   make local               # syncs deps first, then runs this
 #   bash scripts/dev.sh
 
 set -euo pipefail

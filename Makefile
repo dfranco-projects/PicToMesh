@@ -1,4 +1,4 @@
-.PHONY: install uninstall lint format test test-fast api worker web dev up down
+.PHONY: install uninstall lint format test test-fast api worker web local docker down
 .DEFAULT_GOAL := install
 
 # ── Environment ──────────────────────────────────────────────────────────────
@@ -41,6 +41,7 @@ test-fast:
 # ── Local run (no Docker) ─────────────────────────────────────────────────────
 
 API_PORT ?= 8000
+EXTRAS := --extra single-image --extra depth --extra multi-view
 
 api:
 	uv run uvicorn backend.api.main:app --reload --port $(API_PORT)
@@ -52,12 +53,14 @@ web:
 	@test -d frontend/node_modules || (cd frontend && npm install)
 	cd frontend && npm run dev
 
-dev:
+local:
+	@command -v uv > /dev/null || { echo "uv is not installed. macOS: brew install uv node redis"; exit 1; }
+	uv sync $(EXTRAS)
 	@bash scripts/dev.sh
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
-up:
+docker:
 	docker compose up --build
 
 down:

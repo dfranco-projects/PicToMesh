@@ -138,7 +138,9 @@ make lint             # ruff check src/ tests/
 make format           # ruff format + fix src/ tests/
 make test             # pytest tests/ -v
 make test-fast        # pytest -x (stop on first failure)
-make dev              # local full stack, no docker (redis + api + worker + vite)
+make local            # uv sync with model extras, then full stack, no docker (redis + api + worker + vite)
+make docker           # docker compose up --build
+make down             # docker compose down
 make api              # uvicorn on :8000 (local)
 make worker           # arq worker (local)
 make web              # vite dev server on :3000
