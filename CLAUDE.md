@@ -44,6 +44,7 @@ FastAPI (backend/api/)
   ├── POST /jobs              enqueue job → return job_id
   ├── GET  /jobs/{id}         poll status + result URL
   ├── GET  /jobs/{id}/stream  SSE progress
+  ├── GET  /health/worker     worker loading/ready/failed/offline + last startup error
   └── GET  /meshes/{id}       serve GLB/OBJ/STL
   │
   └──► ARQ worker (backend/worker/)
