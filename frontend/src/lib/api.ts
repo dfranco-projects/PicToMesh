@@ -12,6 +12,16 @@ export interface JobResult {
   error: string | null
 }
 
+export interface WorkerError {
+  message: string
+  detail: string
+  at: string
+}
+
+export type WorkerStatus =
+  | { state: "ready" | "loading" | "offline"; since: string | null; error: WorkerError | null }
+  | { state: "failed"; since: string | null; error: WorkerError }
+
 /** A failed API call, with a message fit to show the user. */
 export class ApiError extends Error {
   readonly status: number
@@ -54,6 +64,10 @@ export function submitJob(files: File[], fmt = "glb"): Promise<JobResponse> {
 
 export function fetchJob(jobId: string): Promise<JobResult> {
   return request(`/jobs/${jobId}`)
+}
+
+export function fetchWorkerStatus(): Promise<WorkerStatus> {
+  return request("/health/worker")
 }
 
 export function meshDownloadUrl(meshUrl: string, fmt: string): string {

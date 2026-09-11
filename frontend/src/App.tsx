@@ -1,9 +1,11 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
+import { LoaderCircle } from "lucide-react"
 import { Dropzone } from "@/components/Dropzone"
 import { JobStatus } from "@/components/JobStatus"
 import { Viewer3D } from "@/components/Viewer3D"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { WorkerStatusDialog } from "@/components/WorkerStatusDialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -16,6 +18,7 @@ import {
 } from "@/components/ui/select"
 import { submitJob, type JobResult } from "@/lib/api"
 import { useStore } from "@/store/useStore"
+import { useWorkerStatus } from "@/hooks/useWorkerStatus"
 
 type Stage = "idle" | "processing" | "done" | "error"
 
@@ -25,6 +28,9 @@ export default function App() {
   const [stage, setStage] = useState<Stage>("idle")
   const [error, setError] = useState<string | null>(null)
   const { jobId, meshUrl, setJobId, setMeshUrl, reset } = useStore()
+  const worker = useWorkerStatus()
+  const workerReady = worker.kind === "ready"
+  const preparing = worker.kind === "starting" || worker.kind === "loading"
 
   function fail(reason?: string | null) {
     setError(reason?.trim() || null)
@@ -58,7 +64,7 @@ export default function App() {
     setStage("idle")
   }
 
-  const canSubmit = files.length > 0 && stage === "idle"
+  const canSubmit = files.length > 0 && stage === "idle" && workerReady
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -118,9 +124,18 @@ export default function App() {
 
         {/* Actions */}
         <div className="mt-auto flex flex-col gap-2">
+          {stage === "idle" && preparing && (
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+              <LoaderCircle className="mt-px size-3.5 shrink-0 animate-spin" />
+              {worker.kind === "loading"
+                ? "Preparing the AI models. The first start downloads about 5 GB, so this can take a while."
+                : "Starting PicToMesh…"}
+            </p>
+          )}
+
           {stage === "idle" && (
             <Button onClick={() => startJob()} disabled={!canSubmit || isPending} className="w-full">
-              {isPending ? "Submitting…" : "Generate mesh"}
+              {isPending ? "Submitting…" : preparing ? "Preparing models…" : "Generate mesh"}
             </Button>
           )}
 
@@ -163,6 +178,8 @@ export default function App() {
           <EmptyViewer stage={stage} />
         )}
       </main>
+
+      <WorkerStatusDialog view={worker} />
     </div>
   )
 }

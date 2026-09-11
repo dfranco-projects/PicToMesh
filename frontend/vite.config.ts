@@ -16,6 +16,7 @@ export default defineConfig({
     proxy: {
       "/jobs": `http://localhost:${process.env.API_PORT ?? "8000"}`,
       "/meshes": `http://localhost:${process.env.API_PORT ?? "8000"}`,
+      "/health": `http://localhost:${process.env.API_PORT ?? "8000"}`,
     },
   },
 })
