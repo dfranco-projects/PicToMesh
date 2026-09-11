@@ -56,7 +56,7 @@ class DepthEstimator(Protocol):
 
 
 class MultiViewReconstructor(Protocol):
-    """Implemented by DUSt3R (or any future neural SfM backend)."""
+    """Implemented by Depth Anything 3 (or any future neural SfM backend)."""
 
     def reconstruct(
         self, images: list[np.ndarray], masks: list[np.ndarray] | None = None
@@ -217,7 +217,7 @@ class ReconstructionService:
         reconstructor: MultiViewReconstructor,
         masks: list[np.ndarray] | None = None,
     ) -> o3d.geometry.PointCloud:
-        """Multi-view reconstruction via an injected reconstructor (e.g. DUSt3R).
+        """Multi-view reconstruction via an injected reconstructor (e.g. Depth Anything 3).
 
         Args:
             images:        List of H×W×3 BGR images from different viewpoints.

@@ -32,7 +32,7 @@ class Pipeline:
     Routing logic:
       < image_threshold images   →  single-image model (TripoSR) on the first image, if provided
                                      else depth-lift each image → BPA mesh
-      >= image_threshold images  →  multi-view model (DUSt3R) on the photos → Poisson mesh
+      >= image_threshold images  →  multi-view model (Depth Anything 3) on the photos → Poisson mesh
                                      else same as below threshold
     """
 
