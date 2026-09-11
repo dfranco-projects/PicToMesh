@@ -183,7 +183,7 @@ node_modules/
 # Media output from local api/worker runs
 media/
 
-# Corporate CA certificates for docker builds (see README)
+# Optional CA certificates for docker builds (see docker/backend.dockerfile)
 docker/certs/*.crt
 docker/certs/*.pem
 

@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
-# Optional corporate CA certificates (e.g. Zscaler): drop *.crt into docker/certs/ (gitignored).
+# Optional custom CA certificates: drop *.crt into docker/certs/ (gitignored).
 # UV_SYSTEM_CERTS makes uv trust the system store; the other two cover the model downloads
 # rembg (requests) and huggingface-hub (httpx) do inside the worker.
 COPY docker/certs/ /usr/local/share/ca-certificates/

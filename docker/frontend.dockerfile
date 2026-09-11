@@ -1,6 +1,6 @@
 FROM node:22-slim AS build
 
-# Optional corporate CA certificates, same convention as backend.dockerfile (docker/certs/).
+# Optional custom CA certificates, same convention as backend.dockerfile (docker/certs/).
 # node:22-slim strips the ca-certificates package, so it has to come back for update-ca-certificates.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
