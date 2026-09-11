@@ -29,6 +29,7 @@ def fake_arq():
     arq = MagicMock(spec=ArqRedis)
     arq.enqueue_job = AsyncMock(return_value=None)
     arq.aclose = AsyncMock()
+    arq.exists = AsyncMock(return_value=1)  # a live worker heartbeat, unless a test clears it
     return arq
 
 
@@ -147,6 +148,24 @@ def test_create_job_rejects_oversized_file(client, tmp_path, monkeypatch):
     assert not any(tmp_path.iterdir())
 
 
+def test_create_job_without_worker_returns_503(client, fake_arq, tmp_path, monkeypatch):
+    """With no worker the job would sit queued forever, so refuse it up front."""
+    from backend import config
+
+    monkeypatch.setattr(config.settings, "media_dir", tmp_path)
+    fake_arq.exists.return_value = 0
+
+    r = client.post(
+        "/jobs",
+        files=[("files", ("a.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))],
+    )
+
+    assert r.status_code == 503
+    assert "worker" in r.json()["detail"]
+    fake_arq.enqueue_job.assert_not_awaited()
+    assert not any(tmp_path.iterdir())
+
+
 def test_create_job_rejects_unknown_format(client):
     r = client.post(
         "/jobs?fmt=exe",
@@ -175,6 +194,32 @@ def test_get_job_queued(client):
         r = client.get("/jobs/some-job-id")
     assert r.status_code == 200
     assert r.json()["status"] == JobStatus.queued
+
+
+def test_get_job_queued_without_worker_fails(client, fake_arq):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    fake_arq.exists.return_value = 0
+    with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
+        r = client.get("/jobs/some-job-id")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == JobStatus.failed
+    assert "No worker" in body["error"]
+
+
+def test_get_job_in_progress_without_heartbeat_stays_in_progress(client, fake_arq):
+    """A busy worker can miss heartbeats; the job it holds must not be reported failed."""
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    fake_arq.exists.return_value = 0
+    with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.in_progress)):
+        r = client.get("/jobs/some-job-id")
+
+    assert r.json()["status"] == JobStatus.in_progress
 
 
 def test_get_job_complete_has_mesh_url(client):
@@ -279,6 +324,20 @@ def test_stream_reports_failure_reason_for_finished_job(client):
     assert r.status_code == 200
     assert "no readable images" in r.text
     assert "failed" in r.text
+
+
+def test_stream_closes_with_failure_when_queued_job_has_no_worker(client, fake_arq):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    fake_arq.exists.return_value = 0
+    with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
+        r = client.get("/jobs/abc/stream")
+
+    assert r.status_code == 200
+    assert r.text.startswith("data: ")
+    assert "failed" in r.text
+    assert "No worker" in r.text
 
 
 # ── GET /meshes/{job_id}/{filename} ───────────────────────────────────────────
