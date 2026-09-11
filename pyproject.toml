@@ -41,8 +41,10 @@ depth = [
     "transformers>=4.40.0",
 ]
 multi-view = [
+    "addict>=2.4.0",
     "einops>=0.8.2",
     "huggingface-hub>=1.11.0",
+    "omegaconf>=2.3.0",
     "roma>=1.6.1",
 ]
 

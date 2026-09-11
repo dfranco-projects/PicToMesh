@@ -1642,8 +1642,10 @@ depth = [
     { name = "transformers" },
 ]
 multi-view = [
+    { name = "addict" },
     { name = "einops" },
     { name = "huggingface-hub" },
+    { name = "omegaconf" },
     { name = "roma" },
 ]
 segmentation = [
@@ -1675,6 +1677,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "addict", marker = "extra == 'multi-view'", specifier = ">=2.4.0" },
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "arq", specifier = ">=0.28.0" },
     { name = "einops", marker = "extra == 'multi-view'", specifier = ">=0.8.2" },
@@ -1684,6 +1687,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'multi-view'", specifier = ">=1.11.0" },
     { name = "huggingface-hub", marker = "extra == 'single-image'", specifier = ">=1.11.0" },
     { name = "numpy", specifier = ">=2.2.6" },
+    { name = "omegaconf", marker = "extra == 'multi-view'", specifier = ">=2.3.0" },
     { name = "omegaconf", marker = "extra == 'single-image'", specifier = ">=2.3.0" },
     { name = "onnxruntime", specifier = ">=1.24.3" },
     { name = "open-clip-torch", specifier = ">=3.3.0" },
