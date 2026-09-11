@@ -14,7 +14,7 @@ from arq.jobs import JobStatus as ArqJobStatus
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from backend.config import settings
+from backend.config import WORKER_HEARTBEAT_KEY, settings
 from backend.models import JobResponse, JobResult, JobStatus, ProgressEvent
 
 router = APIRouter()
@@ -65,6 +65,11 @@ def _arq_to_job_status(arq_status: ArqJobStatus) -> JobStatus:
     }.get(arq_status, JobStatus.failed)
 
 
+async def _worker_alive(arq: ArqRedis) -> bool:
+    """True while a worker that finished loading its models keeps its heartbeat fresh."""
+    return bool(await arq.exists(WORKER_HEARTBEAT_KEY))
+
+
 def _is_terminal(data: str) -> bool:
     """True if a published progress payload says the job is over."""
     try:
@@ -83,6 +88,14 @@ async def _job_result(job_id: str, arq: ArqRedis) -> JobResult | None:
     job_status = _arq_to_job_status(arq_status)
     mesh_url: str | None = None
     error: str | None = None
+
+    # Nothing would ever pick it up. In-progress jobs are owned by a worker already.
+    if job_status == JobStatus.queued and not await _worker_alive(arq):
+        return JobResult(
+            job_id=job_id,
+            status=JobStatus.failed,
+            error="No worker is running to pick up this job. Check the worker log.",
+        )
 
     if arq_status == ArqJobStatus.complete:
         try:
@@ -126,6 +139,16 @@ async def create_job(
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=413, detail=f"At most {MAX_FILES} files per job.")
 
+    arq: ArqRedis = request.app.state.arq
+    if not await _worker_alive(arq):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No worker is running. It may still be loading models, "
+                "or it crashed on startup: check the worker log."
+            ),
+        )
+
     job_id = str(uuid.uuid4())
     job_dir = settings.media_dir / job_id
     upload_dir = job_dir / "uploads"
@@ -141,7 +164,6 @@ async def create_job(
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
 
-    arq: ArqRedis = request.app.state.arq
     await arq.enqueue_job("process_images", job_id, saved_paths, fmt, _job_id=job_id)
 
     return JobResponse(job_id=job_id)
