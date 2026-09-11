@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+
 import cv2
 import numpy as np
 from arq import ArqRedis
 
-from backend.config import settings
+from backend.config import WORKER_HEARTBEAT_KEY, settings
 from backend.models import JobStatus, ProgressEvent
 from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
@@ -19,6 +21,11 @@ from pictomesh.reconstruction.service import (
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService
 
 _MAX_SIDE = 512
+
+_HEARTBEAT_SECONDS = 10
+# Well above the refresh interval: GIL-holding steps such as open3d's Poisson
+# freeze the event loop for 10 s or more, and a busy worker must not look dead.
+_HEARTBEAT_TTL_SECONDS = 60
 
 
 def _load_image(path: str) -> np.ndarray | None:
@@ -75,13 +82,27 @@ async def _publish(redis: ArqRedis, event: ProgressEvent) -> None:
     await redis.publish(channel, event.model_dump_json())
 
 
+async def _heartbeat(redis: ArqRedis) -> None:
+    while True:
+        await redis.set(WORKER_HEARTBEAT_KEY, "1", ex=_HEARTBEAT_TTL_SECONDS)
+        await asyncio.sleep(_HEARTBEAT_SECONDS)
+
+
 async def startup(ctx: dict) -> None:
-    """Build the pipeline once per worker process.
+    """Build the pipeline once per worker process, then announce readiness.
 
     Model weights (rembg u2net, Depth Anything) load here rather than per job,
     where they otherwise dominate the runtime of every single job.
     """
     ctx["pipeline"] = _build_pipeline()
+    ctx["heartbeat"] = asyncio.create_task(_heartbeat(ctx["redis"]))
+
+
+async def shutdown(ctx: dict) -> None:
+    """Stop announcing readiness. arq also calls this after a failed startup."""
+    if heartbeat := ctx.get("heartbeat"):
+        heartbeat.cancel()
+    await ctx["redis"].delete(WORKER_HEARTBEAT_KEY)
 
 
 async def process_images(
@@ -127,7 +148,8 @@ async def process_images(
     output_path = output_dir / "mesh"
 
     try:
-        out_file = ctx["pipeline"].run(images, output_path, fmt=fmt)
+        # Off the event loop, so the heartbeat keeps beating and job_timeout can fire.
+        out_file = await asyncio.to_thread(ctx["pipeline"].run, images, output_path, fmt=fmt)
     except Exception as e:
         await _publish(
             redis,

@@ -22,3 +22,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Set by a ready worker and refreshed while it lives; the API reads it to spot a dead worker.
+WORKER_HEARTBEAT_KEY = "pictomesh:worker"
