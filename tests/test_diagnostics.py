@@ -79,6 +79,20 @@ def test_hub_problems_are_named(hub, outcome, reason):
     assert reason in message
 
 
+def test_offline_mode_names_the_missing_cache_instead_of_probing(hub, monkeypatch):
+    """HF_HUB_OFFLINE makes huggingface_hub refuse every request, the probe included."""
+    monkeypatch.setattr(huggingface_hub.constants, "HF_HUB_OFFLINE", True)
+    hub(AssertionError("the hub must not be probed"))
+
+    message, detail = describe_startup_failure(_failed_download())
+
+    assert message == (
+        "The AI models couldn't be downloaded: "
+        "HF_HUB_OFFLINE is set and some are missing from the local cache."
+    )
+    assert "HF_HUB_OFFLINE=1" in detail
+
+
 def test_reachable_hub_means_the_models_failed_to_load(hub):
     hub(200)
 
