@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from datetime import datetime, timezone
 
 import cv2
 import numpy as np
 from arq import ArqRedis
 
-from backend.config import WORKER_HEARTBEAT_KEY, settings
-from backend.models import JobStatus, ProgressEvent
+from backend.config import WORKER_ERROR_KEY, WORKER_HEARTBEAT_KEY, settings
+from backend.models import JobStatus, ProgressEvent, WorkerError, WorkerState, WorkerStatus
+from backend.worker.diagnostics import describe_startup_failure
 from pictomesh.filtering.service import FilteringService
 from pictomesh.mesh.service import MeshService
 from pictomesh.mesh.triposr import TripoSRReconstructor
@@ -19,6 +22,8 @@ from pictomesh.reconstruction.service import (
     ReconstructionService,
 )
 from pictomesh.segmentation.service import RembgSegmentor, SegmentationService
+
+logger = logging.getLogger(__name__)
 
 _MAX_SIDE = 512
 
@@ -82,20 +87,46 @@ async def _publish(redis: ArqRedis, event: ProgressEvent) -> None:
     await redis.publish(channel, event.model_dump_json())
 
 
-async def _heartbeat(redis: ArqRedis) -> None:
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def _announce(ctx: dict) -> None:
+    status: WorkerStatus = ctx["status"]
+    await ctx["redis"].set(
+        WORKER_HEARTBEAT_KEY, status.model_dump_json(), ex=_HEARTBEAT_TTL_SECONDS
+    )
+
+
+async def _heartbeat(ctx: dict) -> None:
     while True:
-        await redis.set(WORKER_HEARTBEAT_KEY, "1", ex=_HEARTBEAT_TTL_SECONDS)
+        await _announce(ctx)
         await asyncio.sleep(_HEARTBEAT_SECONDS)
 
 
 async def startup(ctx: dict) -> None:
-    """Build the pipeline once per worker process, then announce readiness.
+    """Build the pipeline once per worker process, reporting progress as it goes.
 
-    Model weights (rembg u2net, Depth Anything) load here rather than per job,
-    where they otherwise dominate the runtime of every single job.
+    Model weights load here rather than per job, where they otherwise dominate
+    the runtime of every single job. A first start downloads several GB, so the
+    heartbeat runs throughout and the API can tell a loading worker from a dead one.
     """
-    ctx["pipeline"] = _build_pipeline()
-    ctx["heartbeat"] = asyncio.create_task(_heartbeat(ctx["redis"]))
+    redis: ArqRedis = ctx["redis"]
+    ctx["status"] = WorkerStatus(state=WorkerState.loading, since=_now())
+    ctx["heartbeat"] = asyncio.create_task(_heartbeat(ctx))
+    try:
+        ctx["pipeline"] = await asyncio.to_thread(_build_pipeline)
+    except Exception as exc:
+        message, detail = await asyncio.to_thread(describe_startup_failure, exc)
+        logger.exception("Worker startup failed. %s", message)
+        error = WorkerError(message=message, detail=detail, at=_now())
+        await redis.set(WORKER_ERROR_KEY, error.model_dump_json())
+        # Already logged; exit without Python printing the traceback a second time.
+        raise SystemExit(1) from None
+    ctx["status"] = WorkerStatus(state=WorkerState.ready, since=_now())
+    await _announce(ctx)
+    await redis.delete(WORKER_ERROR_KEY)
+    logger.info("Worker ready")
 
 
 async def shutdown(ctx: dict) -> None:

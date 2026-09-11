@@ -23,5 +23,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Set by a ready worker and refreshed while it lives; the API reads it to spot a dead worker.
+# A live worker's WorkerStatus (loading or ready), refreshed while it lives; expires if it dies.
 WORKER_HEARTBEAT_KEY = "pictomesh:worker"
+# The last failed worker startup (WorkerError); kept until a worker becomes ready.
+WORKER_ERROR_KEY = "pictomesh:worker:error"
