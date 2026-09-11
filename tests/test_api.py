@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import io
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import fakeredis
 import fakeredis.aioredis as fake_aioredis
 import pytest
 from arq.connections import ArqRedis
@@ -19,7 +21,12 @@ from fastapi.testclient import TestClient
 
 from backend.api.main import app
 from backend.api.routes.jobs import MAX_FILES, MAX_UPLOAD_BYTES
-from backend.models import JobStatus
+from backend.config import WORKER_ERROR_KEY, WORKER_HEARTBEAT_KEY
+from backend.models import JobStatus, WorkerError, WorkerState, WorkerStatus
+
+CERT_FAILURE = (
+    "The AI models couldn't be downloaded: the certificate check for huggingface.co failed."
+)
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -29,14 +36,40 @@ def fake_arq():
     arq = MagicMock(spec=ArqRedis)
     arq.enqueue_job = AsyncMock(return_value=None)
     arq.aclose = AsyncMock()
-    arq.exists = AsyncMock(return_value=1)  # a live worker heartbeat, unless a test clears it
     return arq
 
 
 @pytest.fixture()
-def client(fake_arq, tmp_path):
+def redis_server():
+    return fakeredis.FakeServer()
+
+
+@pytest.fixture()
+def worker_keys(redis_server):
+    """Sync handle on the app's Redis for setting worker state; the worker starts ready."""
+    keys = fakeredis.FakeRedis(server=redis_server, decode_responses=True)
+    keys.set(WORKER_HEARTBEAT_KEY, WorkerStatus(state=WorkerState.ready).model_dump_json())
+    return keys
+
+
+def set_worker(keys, heartbeat: WorkerState | None, error: str | None = None) -> None:
+    """Put the worker's Redis keys into a given state; None removes a key."""
+    if heartbeat is None:
+        keys.delete(WORKER_HEARTBEAT_KEY)
+    else:
+        keys.set(WORKER_HEARTBEAT_KEY, WorkerStatus(state=heartbeat).model_dump_json())
+    if error is None:
+        keys.delete(WORKER_ERROR_KEY)
+    else:
+        at = datetime(2026, 9, 11, 21, 1, tzinfo=timezone.utc)
+        failure = WorkerError(message=error, detail="OSError: Can't load image processor", at=at)
+        keys.set(WORKER_ERROR_KEY, failure.model_dump_json())
+
+
+@pytest.fixture()
+def client(fake_arq, redis_server, worker_keys, tmp_path):
     """TestClient with fakeredis injected — no real Redis required."""
-    fake_redis = fake_aioredis.FakeRedis(decode_responses=True)
+    fake_redis = fake_aioredis.FakeRedis(server=redis_server, decode_responses=True)
 
     @asynccontextmanager
     async def _fake_lifespan(a):
@@ -57,6 +90,30 @@ def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize(
+    ("heartbeat", "error", "state", "has_error"),
+    [
+        (WorkerState.ready, None, "ready", False),
+        (WorkerState.ready, CERT_FAILURE, "ready", False),  # error about to be cleared
+        (WorkerState.loading, None, "loading", False),
+        (WorkerState.loading, CERT_FAILURE, "loading", True),  # retrying after a failure
+        (None, CERT_FAILURE, "failed", True),
+        (None, None, "offline", False),
+    ],
+)
+def test_worker_health_reports_state(client, worker_keys, heartbeat, error, state, has_error):
+    set_worker(worker_keys, heartbeat, error)
+
+    r = client.get("/health/worker")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["state"] == state
+    assert (body["error"] is not None) == has_error
+    if has_error:
+        assert body["error"]["message"] == CERT_FAILURE
 
 
 # ── POST /jobs ────────────────────────────────────────────────────────────────
@@ -148,12 +205,14 @@ def test_create_job_rejects_oversized_file(client, tmp_path, monkeypatch):
     assert not any(tmp_path.iterdir())
 
 
-def test_create_job_without_worker_returns_503(client, fake_arq, tmp_path, monkeypatch):
+def test_create_job_without_worker_returns_503(
+    client, fake_arq, worker_keys, tmp_path, monkeypatch
+):
     """With no worker the job would sit queued forever, so refuse it up front."""
     from backend import config
 
     monkeypatch.setattr(config.settings, "media_dir", tmp_path)
-    fake_arq.exists.return_value = 0
+    set_worker(worker_keys, None)
 
     r = client.post(
         "/jobs",
@@ -161,9 +220,35 @@ def test_create_job_without_worker_returns_503(client, fake_arq, tmp_path, monke
     )
 
     assert r.status_code == 503
-    assert "worker" in r.json()["detail"]
+    assert r.json()["detail"] == "The processing worker isn't running. Restart PicToMesh."
     fake_arq.enqueue_job.assert_not_awaited()
     assert not any(tmp_path.iterdir())
+
+
+def test_create_job_after_failed_startup_explains_why(client, fake_arq, worker_keys):
+    set_worker(worker_keys, None, CERT_FAILURE)
+
+    r = client.post(
+        "/jobs",
+        files=[("files", ("a.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))],
+    )
+
+    assert r.status_code == 503
+    assert r.json()["detail"].startswith(CERT_FAILURE)
+    fake_arq.enqueue_job.assert_not_awaited()
+
+
+def test_create_job_while_models_load_is_accepted(client, fake_arq, worker_keys):
+    """A loading worker picks the job up once its models are ready."""
+    set_worker(worker_keys, WorkerState.loading)
+
+    r = client.post(
+        "/jobs",
+        files=[("files", ("a.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg"))],
+    )
+
+    assert r.status_code == 202
+    fake_arq.enqueue_job.assert_awaited_once()
 
 
 def test_create_job_rejects_unknown_format(client):
@@ -196,26 +281,44 @@ def test_get_job_queued(client):
     assert r.json()["status"] == JobStatus.queued
 
 
-def test_get_job_queued_without_worker_fails(client, fake_arq):
+@pytest.mark.parametrize(
+    ("heartbeat", "error", "expected_error"),
+    [
+        (None, None, "The processing worker isn't running. Restart PicToMesh."),
+        (None, CERT_FAILURE, CERT_FAILURE),
+    ],
+)
+def test_get_job_queued_without_worker_fails(client, worker_keys, heartbeat, error, expected_error):
     from arq.jobs import Job
     from arq.jobs import JobStatus as ArqJobStatus
 
-    fake_arq.exists.return_value = 0
+    set_worker(worker_keys, heartbeat, error)
     with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
         r = client.get("/jobs/some-job-id")
 
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == JobStatus.failed
-    assert "No worker" in body["error"]
+    assert body["error"].startswith(expected_error)
 
 
-def test_get_job_in_progress_without_heartbeat_stays_in_progress(client, fake_arq):
+def test_get_job_queued_while_models_load_stays_queued(client, worker_keys):
+    from arq.jobs import Job
+    from arq.jobs import JobStatus as ArqJobStatus
+
+    set_worker(worker_keys, WorkerState.loading, CERT_FAILURE)
+    with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
+        r = client.get("/jobs/some-job-id")
+
+    assert r.json()["status"] == JobStatus.queued
+
+
+def test_get_job_in_progress_without_heartbeat_stays_in_progress(client, worker_keys):
     """A busy worker can miss heartbeats; the job it holds must not be reported failed."""
     from arq.jobs import Job
     from arq.jobs import JobStatus as ArqJobStatus
 
-    fake_arq.exists.return_value = 0
+    set_worker(worker_keys, None)
     with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.in_progress)):
         r = client.get("/jobs/some-job-id")
 
@@ -326,18 +429,18 @@ def test_stream_reports_failure_reason_for_finished_job(client):
     assert "failed" in r.text
 
 
-def test_stream_closes_with_failure_when_queued_job_has_no_worker(client, fake_arq):
+def test_stream_closes_with_failure_when_queued_job_has_no_worker(client, worker_keys):
     from arq.jobs import Job
     from arq.jobs import JobStatus as ArqJobStatus
 
-    fake_arq.exists.return_value = 0
+    set_worker(worker_keys, None)
     with patch.object(Job, "status", new=AsyncMock(return_value=ArqJobStatus.queued)):
         r = client.get("/jobs/abc/stream")
 
     assert r.status_code == 200
     assert r.text.startswith("data: ")
     assert "failed" in r.text
-    assert "No worker" in r.text
+    assert "worker isn't running" in r.text
 
 
 # ── GET /meshes/{job_id}/{filename} ───────────────────────────────────────────

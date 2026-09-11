@@ -1,9 +1,10 @@
 """
 Worker task tests
 =================
-Covers image loading with the resolution cap, the readiness heartbeat the API
-uses to spot a dead worker, and that jobs run off the event loop. Pipeline
-execution itself is exercised by the pipeline unit and E2E tests.
+Covers image loading with the resolution cap, the status the worker reports
+while it loads (heartbeat, readiness, startup failure), and that jobs run off
+the event loop. Pipeline execution itself is exercised by the pipeline unit
+and E2E tests.
 """
 
 import asyncio
@@ -15,9 +16,17 @@ import fakeredis.aioredis as fake_aioredis
 import numpy as np
 import pytest
 
-from backend.config import WORKER_HEARTBEAT_KEY
-from backend.models import JobStatus
-from backend.worker.tasks import _MAX_SIDE, _heartbeat, _load_image, process_images, shutdown
+from backend.config import WORKER_ERROR_KEY, WORKER_HEARTBEAT_KEY
+from backend.models import JobStatus, WorkerError, WorkerState, WorkerStatus
+from backend.worker import tasks
+from backend.worker.tasks import (
+    _MAX_SIDE,
+    _heartbeat,
+    _load_image,
+    process_images,
+    shutdown,
+    startup,
+)
 
 
 @pytest.fixture
@@ -55,14 +64,19 @@ def test_load_image_unreadable_returns_none(tmp_path):
 # ── heartbeat ─────────────────────────────────────────────────────────────────
 
 
+async def _heartbeat_state(redis) -> WorkerState:
+    return WorkerStatus.model_validate_json(await redis.get(WORKER_HEARTBEAT_KEY)).state
+
+
 @pytest.mark.anyio
-async def test_heartbeat_sets_an_expiring_key():
+async def test_heartbeat_publishes_state_in_an_expiring_key():
     """The key must expire on its own, or a crashed worker would look alive forever."""
     redis = fake_aioredis.FakeRedis()
-    task = asyncio.create_task(_heartbeat(redis))
+    ctx = {"redis": redis, "status": WorkerStatus(state=WorkerState.loading)}
+    task = asyncio.create_task(_heartbeat(ctx))
     await asyncio.sleep(0.05)
 
-    assert await redis.exists(WORKER_HEARTBEAT_KEY)
+    assert await _heartbeat_state(redis) == WorkerState.loading
     assert 0 < await redis.ttl(WORKER_HEARTBEAT_KEY) <= 60
 
     task.cancel()
@@ -72,7 +86,8 @@ async def test_heartbeat_sets_an_expiring_key():
 @pytest.mark.anyio
 async def test_shutdown_stops_heartbeat_and_clears_key():
     redis = fake_aioredis.FakeRedis()
-    task = asyncio.create_task(_heartbeat(redis))
+    ctx = {"redis": redis, "status": WorkerStatus(state=WorkerState.ready)}
+    task = asyncio.create_task(_heartbeat(ctx))
     await asyncio.sleep(0.05)
 
     await shutdown({"redis": redis, "heartbeat": task})
@@ -89,6 +104,56 @@ async def test_shutdown_after_failed_startup():
     redis = fake_aioredis.FakeRedis()
     await shutdown({"redis": redis})
     assert not await redis.exists(WORKER_HEARTBEAT_KEY)
+    await redis.aclose()
+
+
+# ── startup ───────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.anyio
+async def test_startup_reports_ready_and_clears_the_last_failure(monkeypatch):
+    redis = fake_aioredis.FakeRedis()
+    await redis.set(WORKER_ERROR_KEY, "a failure from an earlier attempt")
+    pipeline = object()
+    monkeypatch.setattr(tasks, "_build_pipeline", lambda: pipeline)
+    ctx = {"redis": redis}
+
+    await startup(ctx)
+
+    assert ctx["pipeline"] is pipeline
+    assert await _heartbeat_state(redis) == WorkerState.ready
+    assert not await redis.exists(WORKER_ERROR_KEY)
+    await shutdown(ctx)
+    await redis.aclose()
+
+
+@pytest.mark.anyio
+async def test_startup_failure_records_the_reason_and_exits(monkeypatch):
+    """The UI reads the recorded reason after the worker process is gone."""
+
+    def fail():
+        raise OSError("Can't load image processor for 'depth-anything/Depth-Anything-V2-Small-hf'")
+
+    redis = fake_aioredis.FakeRedis()
+    monkeypatch.setattr(tasks, "_build_pipeline", fail)
+    monkeypatch.setattr(
+        tasks,
+        "describe_startup_failure",
+        lambda exc: ("The AI models couldn't be loaded.", f"OSError: {exc}"),
+    )
+    ctx = {"redis": redis}
+
+    with pytest.raises(SystemExit) as exit_info:
+        await startup(ctx)
+    await shutdown(ctx)  # arq runs this after a failed startup
+    await asyncio.sleep(0)
+
+    assert exit_info.value.code == 1
+    error = WorkerError.model_validate_json(await redis.get(WORKER_ERROR_KEY))
+    assert error.message == "The AI models couldn't be loaded."
+    assert "depth-anything" in error.detail
+    assert not await redis.exists(WORKER_HEARTBEAT_KEY)
+    assert ctx["heartbeat"].cancelled()
     await redis.aclose()
 
 
