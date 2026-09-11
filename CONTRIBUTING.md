@@ -14,13 +14,13 @@ brew install uv node redis
 sudo apt install redis-server nodejs npm && curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then run `make local`. It creates the venv, syncs deps with the model extras (rembg, TripoSR, Depth Anything v2, DUSt3R) and starts redis, api, worker and frontend. Open http://localhost:3000.
+Then run `make local`. It creates the venv, syncs deps with the model extras (rembg, TripoSR, Depth Anything v2, Depth Anything 3) and starts redis, api, worker and frontend. Open http://localhost:3000.
 
 - Committing? Run `make install` once to set up the git hooks.
 - Prefer separate terminals? Run `make api`, `make worker` and `make web` (needs a running Redis).
 - Port 8000 taken? Run `API_PORT=8010 make local` and the Vite proxy follows.
 - A `.env` is optional. Copy `.env.example` to `.env` only if you want to override the defaults.
-- The worker downloads model weights on its first start (TripoSR ~1.7 GB, DUSt3R ~2.4 GB, plus CLIP, Depth Anything v2 Small and u2net). Later runs reuse the cache.
+- The worker downloads model weights on its first start (TripoSR ~1.7 GB, Depth Anything 3 ~1.6 GB, plus CLIP, Depth Anything v2 Small and u2net). Later runs reuse the cache.
 
 ## Commit hooks
 
@@ -41,7 +41,7 @@ FastAPI
   └──► ARQ worker (Redis queue)
          ├── rembg background removal
          ├── TripoSR            1 photo
-         └── DUSt3R + Poisson   2+ photos
+         └── Depth Anything 3   2+ photos (gaps filled from the visual hull, then Poisson)
 ```
 
 - Backend: FastAPI, ARQ + Redis, PyTorch (CUDA / MPS / CPU), Open3D + trimesh
@@ -50,4 +50,4 @@ FastAPI
 
 ## Model licences
 
-PicToMesh itself is MIT. Two vendored models carry their own terms: TripoSR is MIT, DUSt3R is CC BY-NC-SA 4.0, non-commercial use only. Installing the `multi-view` extra therefore limits that deployment to non-commercial use.
+PicToMesh itself is MIT. Two vendored models carry their own terms: TripoSR is MIT; Depth Anything 3's code is Apache-2.0 but the DA3-LARGE-1.1 weights it loads are CC BY-NC 4.0, non-commercial use only. Installing the `multi-view` extra therefore limits that deployment to non-commercial use.

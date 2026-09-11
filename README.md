@@ -45,7 +45,7 @@ Powered by [TripoSR](https://github.com/VAST-AI-Research/TripoSR).
 
 Walk around your object and take a few overlapping shots. Slower, but the shape comes from what you actually shot.
 
-Powered by [DUSt3R](https://github.com/naver/dust3r).
+Powered by [Depth Anything 3](https://github.com/ByteDance-Seed/depth-anything-3).
 
 </td>
 </tr>
@@ -71,7 +71,7 @@ PRs and issues welcome. Running without Docker, commit hooks and how it's built 
 
 ## License
 
-MIT. One catch: DUSt3R, the multi-photo model, is CC BY-NC-SA 4.0, so any setup that includes it is non-commercial only.
+MIT. One catch: the multi-photo model's weights (Depth Anything 3) are CC BY-NC 4.0, so any setup that includes them is non-commercial only.
 
 ---
 
