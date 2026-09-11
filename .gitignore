@@ -192,3 +192,6 @@ docker/certs/*.pem
 
 # agent coordination
 coagent.log
+
+# Meshes written by tests/test_multiview_meshes.py
+tests/output/
