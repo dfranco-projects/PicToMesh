@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   server: {
+    port: 3000,
+    strictPort: true,
     proxy: {
       "/jobs": `http://localhost:${process.env.API_PORT ?? "8000"}`,
       "/meshes": `http://localhost:${process.env.API_PORT ?? "8000"}`,

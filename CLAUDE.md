@@ -141,7 +141,7 @@ make test-fast        # pytest -x (stop on first failure)
 make dev              # local full stack, no docker (redis + api + worker + vite)
 make api              # uvicorn on :8000 (local)
 make worker           # arq worker (local)
-make web              # vite dev server on :5173
+make web              # vite dev server on :3000
 ```
 
 ### Add dependencies

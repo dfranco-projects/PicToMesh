@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Runs the full PicToMesh stack locally, without Docker:
-# Redis + FastAPI (:8000) + ARQ worker + Vite dev server (:5173).
+# Redis + FastAPI (:8000) + ARQ worker + Vite dev server (:3000).
 #
 # Usage:
 #   make dev                 # idiomatic shortcut
@@ -64,7 +64,7 @@ pids+=("$!")
 
 echo ""
 echo "PicToMesh is up:"
-echo "  frontend  http://localhost:5173"
+echo "  frontend  http://localhost:3000"
 echo "  api       http://localhost:${API_PORT}"
 echo "Press Ctrl-C to stop everything."
 
