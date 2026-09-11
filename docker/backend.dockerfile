@@ -28,7 +28,7 @@ RUN apt-get update \
 
 # Install dependencies — Linux resolver picks torch+cpu automatically (see pyproject.toml)
 # Extras: single-image ships rembg + TripoSR, depth ships Depth Anything v2,
-# multi-view ships DUSt3R (CC BY-NC-SA 4.0, non-commercial)
+# multi-view ships Depth Anything 3 (weights CC BY-NC 4.0, non-commercial)
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project --extra single-image --extra depth --extra multi-view
 
