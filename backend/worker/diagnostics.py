@@ -32,6 +32,9 @@ def _probe_hub() -> tuple[str, str] | None:
     from huggingface_hub import constants
     from huggingface_hub.utils import get_session
 
+    # Offline mode blocks every request, the probe included.
+    if constants.HF_HUB_OFFLINE:
+        return "HF_HUB_OFFLINE is set and some are missing from the local cache", "HF_HUB_OFFLINE=1"
     host = httpx.URL(constants.ENDPOINT).host
     try:
         response = get_session().head(constants.ENDPOINT, timeout=10)
