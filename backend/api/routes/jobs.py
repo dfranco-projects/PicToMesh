@@ -13,8 +13,10 @@ from arq.jobs import Job
 from arq.jobs import JobStatus as ArqJobStatus
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from redis.asyncio import Redis
 
-from backend.config import WORKER_HEARTBEAT_KEY, settings
+from backend.api.worker_status import read_worker_status, unavailable_reason
+from backend.config import settings
 from backend.models import JobResponse, JobResult, JobStatus, ProgressEvent
 
 router = APIRouter()
@@ -65,11 +67,6 @@ def _arq_to_job_status(arq_status: ArqJobStatus) -> JobStatus:
     }.get(arq_status, JobStatus.failed)
 
 
-async def _worker_alive(arq: ArqRedis) -> bool:
-    """True while a worker that finished loading its models keeps its heartbeat fresh."""
-    return bool(await arq.exists(WORKER_HEARTBEAT_KEY))
-
-
 def _is_terminal(data: str) -> bool:
     """True if a published progress payload says the job is over."""
     try:
@@ -78,7 +75,7 @@ def _is_terminal(data: str) -> bool:
         return False
 
 
-async def _job_result(job_id: str, arq: ArqRedis) -> JobResult | None:
+async def _job_result(job_id: str, arq: ArqRedis, redis: Redis) -> JobResult | None:
     """Current state of *job_id*, or None if arq has never heard of it."""
     job = Job(job_id, arq)
     arq_status = await job.status()
@@ -90,12 +87,10 @@ async def _job_result(job_id: str, arq: ArqRedis) -> JobResult | None:
     error: str | None = None
 
     # Nothing would ever pick it up. In-progress jobs are owned by a worker already.
-    if job_status == JobStatus.queued and not await _worker_alive(arq):
-        return JobResult(
-            job_id=job_id,
-            status=JobStatus.failed,
-            error="No worker is running to pick up this job. Check the worker log.",
-        )
+    if job_status == JobStatus.queued:
+        reason = unavailable_reason(await read_worker_status(redis))
+        if reason:
+            return JobResult(job_id=job_id, status=JobStatus.failed, error=reason)
 
     if arq_status == ArqJobStatus.complete:
         try:
@@ -111,9 +106,9 @@ async def _job_result(job_id: str, arq: ArqRedis) -> JobResult | None:
     return JobResult(job_id=job_id, status=job_status, mesh_url=mesh_url, error=error)
 
 
-async def _terminal_event(job_id: str, arq: ArqRedis) -> ProgressEvent | None:
+async def _terminal_event(job_id: str, arq: ArqRedis, redis: Redis) -> ProgressEvent | None:
     """A synthesised final event if the job is already over, else None."""
-    result = await _job_result(job_id, arq)
+    result = await _job_result(job_id, arq, redis)
     if result is None or result.status not in _TERMINAL:
         return None
     failed = result.status == JobStatus.failed
@@ -139,15 +134,10 @@ async def create_job(
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=413, detail=f"At most {MAX_FILES} files per job.")
 
-    arq: ArqRedis = request.app.state.arq
-    if not await _worker_alive(arq):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "No worker is running. It may still be loading models, "
-                "or it crashed on startup: check the worker log."
-            ),
-        )
+    # A loading worker will get to the job; a failed or missing one never will.
+    reason = unavailable_reason(await read_worker_status(request.app.state.redis))
+    if reason:
+        raise HTTPException(status_code=503, detail=reason)
 
     job_id = str(uuid.uuid4())
     job_dir = settings.media_dir / job_id
@@ -164,6 +154,7 @@ async def create_job(
         shutil.rmtree(job_dir, ignore_errors=True)
         raise
 
+    arq: ArqRedis = request.app.state.arq
     await arq.enqueue_job("process_images", job_id, saved_paths, fmt, _job_id=job_id)
 
     return JobResponse(job_id=job_id)
@@ -171,7 +162,7 @@ async def create_job(
 
 @router.get("/{job_id}", response_model=JobResult)
 async def get_job(job_id: str, request: Request) -> JobResult:
-    result = await _job_result(job_id, request.app.state.arq)
+    result = await _job_result(job_id, request.app.state.arq, request.app.state.redis)
     if result is None:
         raise HTTPException(status_code=404, detail="Job not found.")
     return result
@@ -184,7 +175,7 @@ async def stream_job(job_id: str, request: Request) -> StreamingResponse:
     arq: ArqRedis = request.app.state.arq
     channel = f"job:{job_id}:progress"
 
-    if await _job_result(job_id, arq) is None:
+    if await _job_result(job_id, arq, redis) is None:
         raise HTTPException(status_code=404, detail="Job not found.")
 
     async def event_generator():
@@ -193,7 +184,7 @@ async def stream_job(job_id: str, request: Request) -> StreamingResponse:
         started = last_beat = time.monotonic()
         try:
             # Subscribed first, so this only has to catch a job that finished earlier.
-            settled = await _terminal_event(job_id, arq)
+            settled = await _terminal_event(job_id, arq, redis)
             if settled is not None:
                 yield f"data: {settled.model_dump_json()}\n\n"
                 return

@@ -5,11 +5,13 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 from arq import create_pool
 from arq.connections import RedisSettings
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import jobs, meshes
+from backend.api.worker_status import read_worker_status
 from backend.config import settings
+from backend.models import WorkerStatus
 
 
 @asynccontextmanager
@@ -37,3 +39,8 @@ app.include_router(meshes.router, prefix="/meshes", tags=["meshes"])
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/health/worker", response_model=WorkerStatus)
+async def worker_health(request: Request) -> WorkerStatus:
+    return await read_worker_status(request.app.state.redis)
