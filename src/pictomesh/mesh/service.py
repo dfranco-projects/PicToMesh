@@ -9,11 +9,14 @@ import trimesh
 
 ExportFormat = Literal["glb", "obj", "stl"]
 
-# Poisson closes the surface across gaps in the cloud with inflated patches. Those have
-# the lowest sample density, so the sparsest vertices are cut.
-POISSON_TRIM_QUANTILE = 0.05
-# Trimming leaves debris behind; connected pieces below this share of the triangles go too.
-POISSON_MIN_FRAGMENT = 0.01
+# Stray point clusters mesh into separate pieces (Poisson can inflate a few hundred points
+# into a large blob), as can inner shells. A photo set shows one object, so pieces smaller
+# than this share of the largest piece's triangles go.
+POISSON_MIN_PIECE = 0.2
+# Poisson's working cube, relative to the cloud's bounding box (Open3D default 1.1). Where
+# the cloud has a gap, the closing surface can bulge past the points; a tight cube slices
+# that bulge flat and leaves a hole.
+POISSON_SCALE = 1.3
 
 
 class MeshService:
@@ -26,8 +29,10 @@ class MeshService:
     ) -> trimesh.Trimesh:
         """Poisson surface reconstruction.
 
-        Best for dense, uniformly sampled point clouds. Higher depth → finer
-        detail but slower. Produces a watertight mesh.
+        Best for dense, uniformly sampled point clouds with consistently oriented normals;
+        normals already on the cloud are kept. Higher depth → finer detail but slower.
+        Produces a watertight mesh: gaps in the cloud should be filled before this (the
+        multi-view reconstructor adds visual-hull samples), not trimmed away after.
 
         Runs single-threaded: Open3D's parallel octree build races and segfaults.
         Measured on a 5k-point box cloud, one call per fresh process — n_threads=-1
@@ -35,11 +40,9 @@ class MeshService:
         crashed 0/25. Costs ~1.5x runtime (1.9s → 3.0s at depth 9 on 50k points).
         """
         pcd = self._ensure_normals(pcd)
-        mesh_o3d, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
-            pcd, depth=depth, n_threads=1
+        mesh_o3d, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
+            pcd, depth=depth, scale=POISSON_SCALE, n_threads=1
         )
-        densities = np.asarray(densities)
-        mesh_o3d.remove_vertices_by_mask(densities < np.quantile(densities, POISSON_TRIM_QUANTILE))
         self._drop_fragments(mesh_o3d)
         return self._to_trimesh(mesh_o3d)
 
@@ -98,10 +101,13 @@ class MeshService:
 
     @staticmethod
     def _drop_fragments(mesh_o3d: o3d.geometry.TriangleMesh) -> None:
-        """Remove connected components smaller than POISSON_MIN_FRAGMENT of the triangles."""
+        """Remove connected pieces smaller than POISSON_MIN_PIECE of the largest one."""
         cluster_ids, cluster_sizes, _ = mesh_o3d.cluster_connected_triangles()
-        sizes = np.asarray(cluster_sizes)[np.asarray(cluster_ids)]
-        mesh_o3d.remove_triangles_by_mask(sizes < POISSON_MIN_FRAGMENT * len(mesh_o3d.triangles))
+        cluster_sizes = np.asarray(cluster_sizes)
+        if len(cluster_sizes) == 0:
+            return
+        sizes = cluster_sizes[np.asarray(cluster_ids)]
+        mesh_o3d.remove_triangles_by_mask(sizes < POISSON_MIN_PIECE * cluster_sizes.max())
         mesh_o3d.remove_unreferenced_vertices()
 
     def _to_trimesh(self, mesh_o3d: o3d.geometry.TriangleMesh) -> trimesh.Trimesh:
