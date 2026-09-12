@@ -19,6 +19,8 @@ NORMAL_NEIGHBOURS = 30
 # Statistical outlier removal: stray depth at silhouettes makes Poisson wrap domes around it
 OUTLIER_NEIGHBOURS = 20
 OUTLIER_STD_RATIO = 2.0
+ALIGN_DISTANCE = 0.01  # ICP pairing radius, of the cloud's extent; DA3 leaves views 1-2% apart
+ALIGN_ROUNDS = 2
 CONSISTENCY_TOLERANCE = 0.02  # relative depth within which another view confirms a point
 CONSISTENCY_MASK_DILATION = 0.01  # of the image diagonal
 
@@ -64,7 +66,7 @@ def lift_views(
     cameras = np.stack([_homogeneous(w2c) @ to_first for w2c in world_to_cameras])
     trusted = _trusted_views(conf, subjects, depth)
 
-    points, normals, colors, owners, observed, used = [], [], [], [], [], []
+    clouds, observed, used = [], [], []
     for i, (d, c, k, cam, subject, rgb) in enumerate(
         zip(depth, conf, intrinsics, cameras, subjects, rgbs)
     ):
@@ -86,14 +88,17 @@ def lift_views(
         view = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(xyz))
         view.estimate_normals(o3d.geometry.KDTreeSearchParamKNN(NORMAL_NEIGHBOURS))
         view.orient_normals_towards_camera_location(camera_to_first[:3, 3])
-        points.append(xyz)
-        normals.append(np.asarray(view.normals))
-        colors.append(rgb[v, u] / 255.0)
-        owners.append(np.full(len(xyz), i))
+        view.colors = o3d.utility.Vector3dVector(rgb[v, u] / 255.0)
+        clouds.append(view)
 
-    if not points:
+    if not clouds:
         raise ValueError("No confident subject pixels in any view.")
-    points, normals, colors, owner = map(np.concatenate, (points, normals, colors, owners))
+    for i, move in zip(used, _align(clouds)):
+        cameras[i] = cameras[i] @ np.linalg.inv(move)
+    points = np.concatenate([np.asarray(view.points) for view in clouds])
+    normals = np.concatenate([np.asarray(view.normals) for view in clouds])
+    colors = np.concatenate([np.asarray(view.colors) for view in clouds])
+    owner = np.concatenate([np.full(len(view.points), i) for i, view in zip(used, clouds)])
     agreed = _agreed_by_other_views(
         points,
         owner,
@@ -177,6 +182,35 @@ def _trusted_views(conf: np.ndarray, subjects: list[np.ndarray], depth: np.ndarr
     if len(medians) < 3:
         return [True] * len(medians)
     return list(medians >= LOW_CONFIDENCE_RATIO * np.median(medians))
+
+
+def _align(views: list[o3d.geometry.PointCloud]) -> list[np.ndarray]:
+    """ICP each view onto the others in place; returns each view's total move"""
+    moves = [np.eye(4) for _ in views]
+    if len(views) < 2:
+        return moves
+    extent = float(np.ptp(np.concatenate([np.asarray(v.points) for v in views]), axis=0).max())
+    for _ in range(ALIGN_ROUNDS):
+        for i, view in enumerate(views):
+            others = o3d.geometry.PointCloud()
+            for j, other in enumerate(views):
+                if j != i:
+                    others += other
+            fit = o3d.pipelines.registration.registration_icp(
+                view,
+                others,
+                ALIGN_DISTANCE * extent,
+                np.eye(4),
+                o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+                o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=50),
+            )
+            moved = o3d.geometry.PointCloud(view).transform(fit.transformation)
+            if np.median(moved.compute_point_cloud_distance(others)) < np.median(
+                view.compute_point_cloud_distance(others)
+            ):
+                view.transform(fit.transformation)
+                moves[i] = fit.transformation @ moves[i]
+    return moves
 
 
 def _agreed_by_other_views(
