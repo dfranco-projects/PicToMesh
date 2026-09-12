@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import open3d as o3d
 import pytest
@@ -101,6 +103,18 @@ class TestExport:
     def test_default_format_is_glb(self, service, bpa_sphere_mesh, tmp_path):
         out = service.export(bpa_sphere_mesh, tmp_path / "mesh")
         assert out.suffix == ".glb"
+
+    def test_glb_carries_normals_and_colours(self, service, tmp_path):
+        """Viewers shade glTF meshes without normals flat, one facet per triangle"""
+        mesh = trimesh.creation.icosphere()
+        mesh.visual.vertex_colors = [200, 50, 50, 255]
+        out = service.export(mesh, tmp_path / "mesh", fmt="glb")
+
+        data = out.read_bytes()
+        gltf = json.loads(data[20 : 20 + int.from_bytes(data[12:16], "little")])
+        assert {"NORMAL", "COLOR_0"} <= gltf["meshes"][0]["primitives"][0]["attributes"].keys()
+        loaded = trimesh.load(out, force="mesh", process=False)
+        assert (loaded.visual.vertex_colors == [200, 50, 50, 255]).all()
 
 
 def test_poisson_keeps_vertex_colours(service, sphere_pcd):

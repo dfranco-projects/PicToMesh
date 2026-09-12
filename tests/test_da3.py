@@ -13,6 +13,7 @@ from pictomesh.reconstruction.da3 import (
     PATCH_SIZE,
     PROCESS_RES,
     _agreed_by_other_views,
+    _align,
     _trusted_views,
     lift_views,
     normalise_scale,
@@ -101,23 +102,81 @@ def test_views_far_less_confident_than_the_rest_are_not_trusted():
     assert _trusted_views(conf, subjects, depth) == [True, True, False]
 
 
-def test_points_another_view_contradicts_are_dropped():
-    """Ghost copies land where another view saw background or empty space; hidden points stay"""
+def _plane_before_wall():
+    """Full-photo depth as DA3 predicts it: the square at depth 2, a wall at 6 around it"""
     depth, _, k, w2c, subjects, _ = _planar_views()
+    return np.where(subjects, depth, 6.0), k, w2c
+
+
+def test_points_another_view_contradicts_are_dropped():
+    """Ghost copies sit where another view saw through to something farther; hidden points stay"""
+    depth, k, w2c = _plane_before_wall()
     points = np.array(
         [
             [0.0, 0.0, 2.0],  # on the plane: the other view measured it there
-            [0.9, 0.0, 2.0],  # beside the plane: the other view saw background
+            [0.9, 0.0, 2.0],  # beside the plane: the other view saw the wall behind it
             [0.0, 0.0, 3.0],  # behind the plane: hidden from the other view, no evidence
             [0.0, 0.0, 1.5],  # in front of the plane: the other view saw through it
         ]
     )
     owner = np.zeros(len(points), dtype=int)
-    measured = [np.where(s, d, 0.0) for d, s in zip(depth, subjects)]  # as lift_views passes them
 
-    agreed = _agreed_by_other_views(points, owner, [0, 1], measured, subjects, k, w2c)
+    agreed = _agreed_by_other_views(points, owner, [0, 1], depth, k, w2c)
 
     assert agreed.tolist() == [True, False, True, False]
+
+
+def test_thin_parts_that_reproject_a_pixel_off_are_kept():
+    depth, k, w2c = _plane_before_wall()
+    depth[1] = 6.0
+    depth[1, :, 30:32] = 2.0  # the other view sees a 2 px rod at depth 2...
+    # ...and view 0's point on it lands 2 px beside it, on the wall
+    u = 33
+    point = np.array([[(u + 0.5 - k[1, 0, 2]) * 2.0 / k[1, 0, 0] + 0.1, 0.0, 2.0]])
+
+    agreed = _agreed_by_other_views(point, np.zeros(1, dtype=int), [0, 1], depth, k, w2c)
+
+    assert agreed.tolist() == [True]
+
+
+def test_parts_another_views_mask_misses_are_kept(monkeypatch):
+    """rembg can miss thin dark parts in some photos; DA3's depth still sees them there"""
+    no_fill = (np.empty((0, 3)),) * 3  # only what the photos saw
+    monkeypatch.setattr(
+        "pictomesh.reconstruction.da3.fill_unobserved", lambda *args, **kwargs: no_fill
+    )
+    depth, conf, k, w2c, subjects, rgbs = _planar_views()
+    subjects[1][:, 30:] = False  # view 1's mask misses the square's right side...
+    rgbs[0][:, 30:] = (255, 0, 0)  # ...which view 0 saw, in red
+
+    pcd = lift_views(depth, conf, k, w2c, subjects, rgbs)
+
+    red = np.asarray(pcd.points)[np.asarray(pcd.colors)[:, 1] < 0.5]
+    width, height = np.ptp(red[:, :2], axis=0)
+    assert width > 0.3 * height  # the 15 by 34 px strip, not a sliver along view 1's mask edge
+
+
+def test_views_a_pose_error_shifted_are_pulled_back_together():
+    rng = np.random.default_rng(0)
+    shift = np.array([0.006, -0.008, 0.008])  # under 1% of the surface, as DA3 leaves views
+    views = []
+    for offset in (np.zeros(3), shift):
+        xy = rng.uniform(-1, 1, (20_000, 2))
+        bumps = 0.2 * np.sin(3 * xy[:, 0]) * np.cos(2 * xy[:, 1])  # something for ICP to grip
+        view = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(np.column_stack([xy, bumps])))
+        view.translate(offset)
+        view.estimate_normals(o3d.geometry.KDTreeSearchParamKNN(20))
+        views.append(view)
+    before = np.asarray(views[0].points).copy()
+
+    moves = _align(views)
+
+    relative = np.linalg.inv(moves[1]) @ moves[0]  # view 1's remaining offset from view 0
+    np.testing.assert_allclose(relative[:3, 3], shift, atol=2e-3)
+    np.testing.assert_allclose(relative[:3, :3], np.eye(3), atol=1e-2)
+    # lift_views moves each camera by its view's move, so the move must match the points
+    moved = before @ moves[0][:3, :3].T + moves[0][:3, 3]
+    np.testing.assert_allclose(np.asarray(views[0].points), moved, atol=1e-9)
 
 
 def test_two_views_are_always_trusted():
