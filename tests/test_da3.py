@@ -14,6 +14,7 @@ import pytest
 from pictomesh.reconstruction.da3 import (
     PATCH_SIZE,
     PROCESS_RES,
+    _agreed_by_other_views,
     _trusted_views,
     lift_views,
     normalise_scale,
@@ -100,6 +101,25 @@ def test_views_far_less_confident_than_the_rest_are_not_trusted():
     subjects = [np.ones((4, 4), bool)] * 3
     depth = np.ones((3, 4, 4), np.float32)
     assert _trusted_views(conf, subjects, depth) == [True, True, False]
+
+
+def test_points_another_view_contradicts_are_dropped():
+    """Ghost copies land where another view saw background or empty space; hidden points stay"""
+    depth, _, k, w2c, subjects, _ = _planar_views()
+    points = np.array(
+        [
+            [0.0, 0.0, 2.0],  # on the plane: the other view measured it there
+            [0.9, 0.0, 2.0],  # beside the plane: the other view saw background
+            [0.0, 0.0, 3.0],  # behind the plane: hidden from the other view, no evidence
+            [0.0, 0.0, 1.5],  # in front of the plane: the other view saw through it
+        ]
+    )
+    owner = np.zeros(len(points), dtype=int)
+    measured = [np.where(s, d, 0.0) for d, s in zip(depth, subjects)]  # as lift_views passes them
+
+    agreed = _agreed_by_other_views(points, owner, [0, 1], measured, subjects, k, w2c)
+
+    assert agreed.tolist() == [True, False, True, False]
 
 
 def test_two_views_are_always_trusted():
