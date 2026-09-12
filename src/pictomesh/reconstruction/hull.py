@@ -86,7 +86,7 @@ def carve(
         dilated = cv2.dilate(mask.astype(np.uint8), kernel).astype(bool)
         cam = centres @ w2c[:3, :3].T + w2c[:3, 3]
         z = cam[:, 2]
-        u, v, seen = _project(cam, k, w, h)
+        u, v, seen = project(cam, k, w, h)
         in_mask = np.zeros(len(cam), dtype=bool)
         in_mask[seen] = dilated[v[seen], u[seen]]
         occupied &= ~seen | in_mask
@@ -228,7 +228,7 @@ def _extend_depth(depth: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return out
 
 
-def _project(
+def project(
     cam: np.ndarray, k: np.ndarray, w: int, h: int
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Pixel coordinates of camera-frame points, and which of them land in the image."""

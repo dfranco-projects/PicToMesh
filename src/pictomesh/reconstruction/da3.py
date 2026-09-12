@@ -7,7 +7,7 @@ import numpy as np
 import open3d as o3d
 
 from pictomesh.device import default_device
-from pictomesh.reconstruction.hull import fill_unobserved
+from pictomesh.reconstruction.hull import fill_unobserved, project
 
 MODEL = "depth-anything/DA3-LARGE-1.1"
 PROCESS_RES = 504  # DA3's working resolution, on the long side
@@ -29,6 +29,8 @@ NORMAL_NEIGHBOURS = 30
 # around it. The confidence cut can't catch it in scenes DA3 is unsure of throughout.
 OUTLIER_NEIGHBOURS = 20
 OUTLIER_STD_RATIO = 2.0
+CONSISTENCY_TOLERANCE = 0.02  # relative depth within which another view confirms a point
+CONSISTENCY_MASK_DILATION = 0.01  # of the image diagonal
 
 
 def prepare_views(
@@ -81,7 +83,7 @@ def lift_views(
     cameras = np.stack([_homogeneous(w2c) @ to_first for w2c in world_to_cameras])
     trusted = _trusted_views(conf, subjects, depth)
 
-    points, normals, colors, observed, used = [], [], [], [], []
+    points, normals, colors, owners, observed, used = [], [], [], [], [], []
     for i, (d, c, k, cam, subject, rgb) in enumerate(
         zip(depth, conf, intrinsics, cameras, subjects, rgbs)
     ):
@@ -106,10 +108,21 @@ def lift_views(
         points.append(xyz)
         normals.append(np.asarray(view.normals))
         colors.append(rgb[v, u] / 255.0)
+        owners.append(np.full(len(xyz), i))
 
     if not points:
         raise ValueError("No confident subject pixels in any view.")
-    points, normals, colors = map(np.concatenate, (points, normals, colors))
+    points, normals, colors, owner = map(np.concatenate, (points, normals, colors, owners))
+    agreed = _agreed_by_other_views(
+        points,
+        owner,
+        used,
+        observed,
+        [subjects[i] for i in used],
+        intrinsics[used],
+        cameras[used],
+    )
+    points, normals, colors = points[agreed], normals[agreed], colors[agreed]
     merged = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(points))
     _, inliers = merged.remove_statistical_outlier(OUTLIER_NEIGHBOURS, OUTLIER_STD_RATIO)
     points, normals, colors = points[inliers], normals[inliers], colors[inliers]
@@ -190,6 +203,41 @@ def _trusted_views(conf: np.ndarray, subjects: list[np.ndarray], depth: np.ndarr
     if len(medians) < 3:
         return [True] * len(medians)
     return list(medians >= LOW_CONFIDENCE_RATIO * np.median(medians))
+
+
+def _agreed_by_other_views(
+    points: np.ndarray,
+    owner: np.ndarray,
+    views: list[int],
+    depths: list[np.ndarray],
+    masks: list[np.ndarray],
+    intrinsics: np.ndarray,
+    cameras: np.ndarray,
+) -> np.ndarray:
+    """False for points more of the other views contradict than confirm (ghost copies)
+
+    A view confirms a point it measured at the same depth and contradicts one it sees
+    against background or in front of its surface; a point hidden behind that surface is
+    no evidence either way
+    """
+    support = np.zeros(len(points), dtype=int)
+    conflict = np.zeros(len(points), dtype=int)
+    for j, depth, mask, k, cam in zip(views, depths, masks, intrinsics, cameras):
+        other = np.flatnonzero(owner != j)
+        h, w = mask.shape
+        radius = max(1, round(CONSISTENCY_MASK_DILATION * np.hypot(h, w)))
+        dilated = cv2.dilate(mask.astype(np.uint8), np.ones((2 * radius + 1,) * 2, np.uint8))
+        in_camera = points[other] @ cam[:3, :3].T + cam[:3, 3]
+        u, v, inside = project(in_camera, k, w, h)
+        z = in_camera[:, 2]
+        measured = np.zeros(len(other))
+        measured[inside] = depth[v[inside], u[inside]]
+        background = np.zeros(len(other), dtype=bool)
+        background[inside] = dilated[v[inside], u[inside]] == 0
+        known = measured > 0
+        support[other] += known & (np.abs(z - measured) <= CONSISTENCY_TOLERANCE * measured)
+        conflict[other] += background | (known & (z < measured * (1 - CONSISTENCY_TOLERANCE)))
+    return conflict <= support
 
 
 def _nearest_multiple(x: float) -> int:
