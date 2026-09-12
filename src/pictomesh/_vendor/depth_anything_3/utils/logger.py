@@ -15,8 +15,7 @@
 import logging
 import os
 
-# pictomesh patch: messages go through the logging module (the app's timestamped format)
-# instead of coloured print() calls.
+# pictomesh patch: log through the logging module instead of print()
 _STDLIB = logging.getLogger("depth_anything_3")
 _STDLIB_LEVELS = {"ERROR": logging.ERROR, "WARN": logging.WARNING, "INFO": logging.INFO, "DEBUG": logging.DEBUG}
 

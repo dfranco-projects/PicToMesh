@@ -120,8 +120,7 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
         Returns:
             Dictionary containing model predictions
         """
-        # pictomesh patch: mixed precision on CUDA only. Elsewhere is_bf16_supported() is False,
-        # which forced fp16 autocast onto MPS/CPU; run those in fp32 instead.
+        # pictomesh patch: autocast on CUDA only, fp32 on MPS/CPU
         use_autocast = image.device.type == "cuda"
         autocast_dtype = torch.bfloat16 if use_autocast and torch.cuda.is_bf16_supported() else torch.float16
         with torch.no_grad():
@@ -349,7 +348,7 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
         """Align depth map to input extrinsics"""
         if extrinsics is None:
             return prediction
-        # pictomesh patch: pose alignment (utils.pose_align, which needs evo) is not vendored.
+        # pictomesh patch: pose alignment (needs evo) is not vendored
         raise NotImplementedError("Aligning to input extrinsics is not available in the vendored DA3.")
         prediction.intrinsics = intrinsics.numpy()
         _, _, scale, aligned_extrinsics = align_poses_umeyama(
@@ -417,7 +416,7 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
         self, prediction: Prediction, export_format: str, export_dir: str, **kwargs
     ) -> None:
         """Export results to specified format and directory."""
-        # pictomesh patch: exporters (utils.export) are not vendored; use the Prediction directly.
+        # pictomesh patch: exporters are not vendored
         raise NotImplementedError("Exporting is not available in the vendored DA3.")
         start_time = time.time()
         export(prediction, export_format, export_dir, **kwargs)  # noqa: F821

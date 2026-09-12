@@ -1,8 +1,8 @@
 """
 Visual hull tests
 =================
-A sphere seen by four cameras on a ring: its silhouettes are discs, so the carved hull,
-its boundary samples and the gap filling can be checked against known geometry.
+A sphere seen by four cameras on a ring: silhouettes are discs, so carving, boundary
+samples and gap filling can be checked against known geometry
 """
 
 import numpy as np
@@ -24,7 +24,7 @@ SIZE = 200
 
 
 def _look_at_origin(angle: float) -> np.ndarray:
-    """OpenCV world→camera transform for a camera on a ring around the y axis."""
+    """OpenCV world→camera transform for a camera on a ring around the y axis"""
     centre = DISTANCE * np.array([np.sin(angle), 0.0, -np.cos(angle)])
     forward = -centre / np.linalg.norm(centre)
     right = np.cross([0.0, 1.0, 0.0], forward)
@@ -39,7 +39,7 @@ def cameras():
     w2c = np.stack([_look_at_origin(a) for a in np.radians([0, 90, 180, 270])])
     k = np.array([[FOCAL, 0, SIZE / 2], [0, FOCAL, SIZE / 2], [0, 0, 1]])
     intrinsics = np.stack([k] * len(w2c))
-    # A sphere's silhouette from distance D is a disc of radius f·R / √(D² − R²).
+    # A sphere's silhouette from distance D is a disc of radius f·R / √(D² − R²)
     disc = FOCAL * RADIUS / np.sqrt(DISTANCE**2 - RADIUS**2)
     v, u = np.mgrid[:SIZE, :SIZE]
     mask = np.hypot(u - SIZE / 2, v - SIZE / 2) <= disc
@@ -47,7 +47,7 @@ def cameras():
 
 
 def _sphere_depth(w2c: np.ndarray) -> np.ndarray:
-    """Depth map of the sphere from one camera (0 where the ray misses it)."""
+    """Depth map of the sphere from one camera (0 where the ray misses it)"""
     v, u = np.mgrid[:SIZE, :SIZE]
     rays = np.stack([(u - SIZE / 2) / FOCAL, (v - SIZE / 2) / FOCAL, np.ones_like(u, float)], -1)
     rotation, centre = w2c[:, :3], -w2c[:, :3].T @ w2c[:, 3]
@@ -82,7 +82,7 @@ def test_carve_keeps_the_inside_and_carves_outside_every_silhouette(cameras):
 
 
 def test_voxels_no_camera_sees_are_not_kept():
-    """A box reaching outside every frame must not keep those corners as phantom volume."""
+    """A box reaching outside every frame must not keep those corners as phantom volume"""
     mask = np.ones((SIZE, SIZE), dtype=bool)
     k = np.array([[FOCAL, 0, SIZE / 2], [0, FOCAL, SIZE / 2], [0, 0, 1]])
     occupancy, _, _ = carve(
@@ -101,11 +101,7 @@ def test_surface_samples_have_outward_normals(cameras):
 
 
 def _sphere_without_cap(cameras):
-    """Sphere points minus the cap facing +x, and the three views that didn't see that cap.
-
-    The camera facing the cap is left out, as the pipeline leaves out a view it doesn't
-    trust; the others bring their depth maps, as trusted views do.
-    """
+    """Sphere points minus the cap facing +x, and the three other views with their depth maps"""
     masks, intrinsics, w2c = cameras
     points, normals = _sphere_points()
     seen = points[:, 0] < 0.3
@@ -118,7 +114,7 @@ def _sphere_without_cap(cameras):
     )
 
 
-def test_fill_goes_into_the_gap_and_stays_near_the_cloud(cameras):
+def test_fill_goes_into_the_gap(cameras):
     points, _, (masks, intrinsics, w2c, depths) = _sphere_without_cap(cameras)
     colors = np.full((len(points), 3), 0.5)
 
@@ -133,7 +129,7 @@ def test_fill_goes_into_the_gap_and_stays_near_the_cloud(cameras):
 
 
 def test_hull_pockets_without_real_points_are_ignored():
-    """A pocket the views failed to rule out, away from the object, is not part of it."""
+    """A pocket the views failed to rule out, away from the object, is not part of it"""
     occupancy = np.zeros((20, 20, 20), dtype=bool)
     occupancy[2:8, 2:8, 2:8] = True  # the object's piece
     occupancy[12:18, 12:18, 12:18] = True  # a separate pocket
@@ -145,7 +141,7 @@ def test_hull_pockets_without_real_points_are_ignored():
 
 
 def test_hull_samples_in_space_a_view_saw_empty_are_dropped(cameras):
-    """With four views the hull bulges past the sphere; the front view's depth rules the bulge out."""
+    """With four views the hull bulges past the sphere; the front view's depth rules the bulge out"""
     masks, intrinsics, w2c = cameras
     points, _ = _sphere_points()
     front = points[points[:, 2] < 0]
@@ -185,6 +181,6 @@ def test_cloud_with_a_gap_plus_fill_meshes_into_one_closed_body(cameras):
 
 
 def open_edges(mesh) -> int:
-    """Edges used by a single face: the rims of holes."""
+    """Edges used by a single face: the rims of holes"""
     _, counts = np.unique(np.sort(mesh.edges, axis=1), axis=0, return_counts=True)
     return int((counts == 1).sum())

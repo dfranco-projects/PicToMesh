@@ -1,14 +1,10 @@
 """
 Multi-view mesh samples
 =======================
-Runs the real multi-photo pipeline (rembg masks, CLIP filtering, Depth Anything 3, hull
-fill, Poisson) on every photo set in tests/assets/ and saves the results in tests/output/
-for a visual check: open <set>.glb (the mesh) or <set>_points.ply (the cloud it came from)
-in VS Code or any 3D viewer.
-
-A set is every image sharing a name before its last "_": chair_1.jpeg, chair_2.jpeg, ...
-Sets with two or more photos are meshed, so dropping name_1.jpg, name_2.jpg, ... anywhere
-in tests/assets/ adds one. Marked slow: downloads and runs the models.
+Runs the real multi-photo pipeline on every photo set in tests/assets/ and saves
+tests/output/<set>.glb (mesh) and <set>_points.ply (its cloud) for a visual check;
+a set is the images sharing a name before the last "_" (chair_1.jpeg, chair_2.jpeg, ...)
+Marked slow: downloads and runs the models
 """
 
 from collections import defaultdict
@@ -32,7 +28,7 @@ def _photo_sets() -> dict[str, list[Path]]:
 
 
 class _KeepsCloud:
-    """Wraps the reconstructor to keep the cloud it hands to the mesher."""
+    """Wraps the reconstructor to keep the cloud it hands to the mesher"""
 
     def __init__(self, reconstructor):
         self._reconstructor = reconstructor

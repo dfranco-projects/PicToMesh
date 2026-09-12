@@ -1,10 +1,8 @@
 """
 Depth Anything 3 reconstructor tests
 ====================================
-Covers everything around the model: view preparation (sizes DA3 leaves unchanged, masks
-kept aligned), lifting depth maps into one cloud with camera-facing normals, dropping
-unreliable pixels and views, and scale normalisation. The model itself runs in the slow
-mesh tests (test_multiview_meshes.py).
+View preparation, lifting depth maps into one cloud, dropping unreliable pixels, views and
+ghost copies, and scale normalisation. The model itself runs in test_multiview_meshes.py
 """
 
 import numpy as np
@@ -37,7 +35,7 @@ def test_views_get_one_shared_size_da3_leaves_alone():
 
 
 def test_masks_stay_aligned_with_mixed_orientations():
-    """A landscape and a portrait photo are cropped to one size; masks must crop identically."""
+    """A landscape and a portrait photo are cropped to one size; masks must crop identically"""
     images, masks = [], []
     for h, w in ((1200, 1600), (1600, 1200)):
         img = np.zeros((h, w, 3), np.uint8)
@@ -58,7 +56,7 @@ def test_masks_stay_aligned_with_mixed_orientations():
 
 
 def _planar_views(n_views: int = 2, size: int = 56):
-    """n cameras side by side looking at a fronto-parallel square at depth 2."""
+    """n cameras side by side looking at a fronto-parallel square at depth 2"""
     k = np.array([[50.0, 0, size / 2], [0, 50.0, size / 2], [0, 0, 1]])
     depth = np.full((n_views, size, size), 2.0, np.float32)
     conf = np.full((n_views, size, size), 5.0, np.float32)

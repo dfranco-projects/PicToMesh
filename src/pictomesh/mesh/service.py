@@ -9,13 +9,9 @@ import trimesh
 
 ExportFormat = Literal["glb", "obj", "stl"]
 
-# Stray point clusters mesh into separate pieces (Poisson can inflate a few hundred points
-# into a large blob), as can inner shells. A photo set shows one object, so pieces smaller
-# than this share of the largest piece's triangles go.
+# One object per photo set: pieces under this share of the largest are stray blobs or shells
 POISSON_MIN_PIECE = 0.2
-# Poisson's working cube, relative to the cloud's bounding box (Open3D default 1.1). Where
-# the cloud has a gap, the closing surface can bulge past the points; a tight cube slices
-# that bulge flat and leaves a hole.
+# Working cube vs the cloud's bounds (Open3D default 1.1): room for gap closures to bulge
 POISSON_SCALE = 1.3
 
 
@@ -29,10 +25,8 @@ class MeshService:
     ) -> trimesh.Trimesh:
         """Poisson surface reconstruction.
 
-        Best for dense, uniformly sampled point clouds with consistently oriented normals;
-        normals already on the cloud are kept. Higher depth → finer detail but slower.
-        Produces a watertight mesh: gaps in the cloud should be filled before this (the
-        multi-view reconstructor adds visual-hull samples), not trimmed away after.
+        Needs consistently oriented normals (kept when the cloud has them). Higher depth →
+        finer detail but slower. Fill gaps before this; the result is watertight.
 
         Runs single-threaded: Open3D's parallel octree build races and segfaults.
         Measured on a 5k-point box cloud, one call per fresh process — n_threads=-1
@@ -101,7 +95,7 @@ class MeshService:
 
     @staticmethod
     def _drop_fragments(mesh_o3d: o3d.geometry.TriangleMesh) -> None:
-        """Remove connected pieces smaller than POISSON_MIN_PIECE of the largest one."""
+        """Remove connected pieces smaller than POISSON_MIN_PIECE of the largest one"""
         cluster_ids, cluster_sizes, _ = mesh_o3d.cluster_connected_triangles()
         cluster_sizes = np.asarray(cluster_sizes)
         if len(cluster_sizes) == 0:

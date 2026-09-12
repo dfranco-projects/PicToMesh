@@ -1,4 +1,4 @@
-"""Multi-view reconstruction with Depth Anything 3 (vendored under pictomesh._vendor.depth_anything_3)."""
+"""Multi-view reconstruction with Depth Anything 3 (vendored under pictomesh._vendor.depth_anything_3)"""
 
 from __future__ import annotations
 
@@ -12,21 +12,11 @@ from pictomesh.reconstruction.hull import fill_unobserved, project
 MODEL = "depth-anything/DA3-LARGE-1.1"
 PROCESS_RES = 504  # DA3's working resolution, on the long side
 PATCH_SIZE = 14
-# Subject pixels below this share of their view's median confidence are dropped: mostly
-# smeared depth along silhouettes. A percentile cut was tried and removed thin parts
-# instead (the statue's arm and head sit at ~0.6× the median; the 30th percentile, ~0.9×).
-MIN_CONFIDENCE_RATIO = 0.3
-# A view whose median subject confidence is this far below the other views' is dropped:
-# on the liberty set, a far shot where the statue fills 3% of the frame scored 1.8 against
-# 5.6-16.5 and landed a fifth of the object's size away from the other views.
-LOW_CONFIDENCE_RATIO = 0.3
-# Silhouette pixels mix subject and background (sky-blue fringes on the liberty statue), so
-# points come from masks shrunk by this many pixels; the hull still uses the full masks.
-MASK_EROSION_PX = 1
+MIN_CONFIDENCE_RATIO = 0.3  # of the view's median; a percentile cut dropped thin parts
+LOW_CONFIDENCE_RATIO = 0.3  # views this far below the others' median confidence are dropped
+MASK_EROSION_PX = 1  # silhouette pixels mix subject and background colours
 NORMAL_NEIGHBOURS = 30
-# Stray depth at silhouettes and thin parts lands far in front of or behind the object
-# (the chair cloud reached 2.6 units deep for 1.6 across); Poisson then wraps a dome
-# around it. The confidence cut can't catch it in scenes DA3 is unsure of throughout.
+# Statistical outlier removal: stray depth at silhouettes makes Poisson wrap domes around it
 OUTLIER_NEIGHBOURS = 20
 OUTLIER_STD_RATIO = 2.0
 CONSISTENCY_TOLERANCE = 0.02  # relative depth within which another view confirms a point
@@ -36,14 +26,9 @@ CONSISTENCY_MASK_DILATION = 0.01  # of the image diagonal
 def prepare_views(
     images: list[np.ndarray], masks: list[np.ndarray] | None = None
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    """Resize photos and masks to one shared size that DA3 processes unchanged.
+    """Resize photos and masks to one shared size DA3 processes unchanged, so masks stay aligned
 
-    Long side to PROCESS_RES and both sides to the nearest multiple of PATCH_SIZE, then a
-    centre crop to the smallest height and width so every view matches. DA3 leaves inputs
-    of that shape alone, so the masks, which get the identical transform, stay aligned
-    with its depth maps.
-
-    Returns RGB uint8 images and boolean masks (all True when *masks* is None).
+    Returns RGB uint8 images and boolean masks (all True when *masks* is None)
     """
     rgbs, subjects = [], []
     for i, bgr in enumerate(images):
@@ -69,14 +54,10 @@ def lift_views(
     subjects: list[np.ndarray],
     rgbs: list[np.ndarray],
 ) -> o3d.geometry.PointCloud:
-    """Merge every view's confident subject pixels into one cloud in the first camera's frame.
+    """Merge every trusted view's subject pixels into one cloud in the first camera's frame
 
-    That frame follows the OpenCV convention (x right, y down, z forward), which is what the
-    pipeline's glTF rotation expects. Normals are estimated per view and turned towards the
-    camera that saw them, which Poisson needs to tell inside from outside. Views the model
-    is much less sure of than the rest are left out entirely (see LOW_CONFIDENCE_RATIO),
-    since their cameras are suspect too. Visual-hull samples then fill the regions no
-    trusted view covered.
+    OpenCV convention, as the pipeline's glTF rotation expects. Normals face the camera that
+    saw each point; visual-hull samples fill what no view covered
     """
     to_first = np.linalg.inv(_homogeneous(world_to_cameras[0]))
     # camera 0 frame → camera i frame, so hull carving works in the output frame too
@@ -143,10 +124,7 @@ def lift_views(
 
 
 def normalise_scale(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
-    """Scale the cloud about the origin so its largest extent is 1.
-
-    Multi-view depth has an arbitrary scale, and the viewer frames unit-sized objects.
-    """
+    """Scale the cloud about the origin to a largest extent of 1 (multi-view scale is arbitrary)"""
     extent = float(np.max(pcd.get_max_bound() - pcd.get_min_bound())) if len(pcd.points) else 0.0
     if extent > 0:
         pcd.scale(1.0 / extent, center=np.zeros(3))
@@ -154,11 +132,10 @@ def normalise_scale(pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
 
 
 class Da3Reconstructor:
-    """Unposed photos → coloured cloud with oriented normals, via Depth Anything 3.
+    """Unposed photos → coloured cloud with oriented normals, via Depth Anything 3
 
-    One forward pass predicts every view's depth, confidence and camera; see lift_views for
-    how they become a cloud. Requires: uv sync --extra multi-view. Weights (~1.6 GB,
-    CC BY-NC 4.0, non-commercial) are downloaded from Hugging Face on first use.
+    Requires: uv sync --extra multi-view. Weights (~1.6 GB, CC BY-NC 4.0, non-commercial)
+    download from Hugging Face on first use
     """
 
     def __init__(self, model: str = MODEL, device: str | None = None) -> None:
@@ -174,7 +151,7 @@ class Da3Reconstructor:
     def reconstruct(
         self, images: list[np.ndarray], masks: list[np.ndarray] | None = None
     ) -> o3d.geometry.PointCloud:
-        """Reconstruct from two or more H×W×3 BGR photos; *masks* are optional H×W subject masks."""
+        """Reconstruct from two or more H×W×3 BGR photos; *masks* are optional H×W subject masks"""
         if len(images) < 2:
             raise ValueError("Multi-view reconstruction needs at least two images.")
         rgbs, subjects = prepare_views(images, masks)
@@ -190,10 +167,7 @@ class Da3Reconstructor:
 
 
 def _trusted_views(conf: np.ndarray, subjects: list[np.ndarray], depth: np.ndarray) -> list[bool]:
-    """False for views whose median subject confidence is far below the others'.
-
-    With two views there is nothing to compare against, so both are kept.
-    """
+    """False for views whose median subject confidence is far below the others' (2 views: both kept)"""
     medians = np.array(
         [
             float(np.median(c[s & (d > 0)])) if (s & (d > 0)).any() else 0.0
