@@ -22,7 +22,7 @@ OUTLIER_STD_RATIO = 2.0
 ALIGN_DISTANCE = 0.01  # ICP pairing radius, of the cloud's extent; DA3 leaves views 1-2% apart
 ALIGN_ROUNDS = 2
 CONSISTENCY_TOLERANCE = 0.02  # relative depth within which another view confirms a point
-CONSISTENCY_MASK_DILATION = 0.01  # of the image diagonal
+CONSISTENCY_SLACK_PX = 2  # thin parts reproject a pixel or two off
 
 
 def prepare_views(
@@ -103,8 +103,7 @@ def lift_views(
         points,
         owner,
         used,
-        observed,
-        [subjects[i] for i in used],
+        np.where(np.isfinite(depth[used]), depth[used], 0.0),
         intrinsics[used],
         cameras[used],
     )
@@ -217,34 +216,34 @@ def _agreed_by_other_views(
     points: np.ndarray,
     owner: np.ndarray,
     views: list[int],
-    depths: list[np.ndarray],
-    masks: list[np.ndarray],
+    depths: np.ndarray,
     intrinsics: np.ndarray,
     cameras: np.ndarray,
 ) -> np.ndarray:
     """False for points more of the other views contradict than confirm (ghost copies)
 
-    A view confirms a point it measured at the same depth and contradicts one it sees
-    against background or in front of its surface; a point hidden behind that surface is
-    no evidence either way
+    A view confirms a point it measured at the same depth and contradicts one it saw
+    through; *depths* cover whole photos, so subject masks that miss thin parts don't count
     """
     support = np.zeros(len(points), dtype=int)
     conflict = np.zeros(len(points), dtype=int)
-    for j, depth, mask, k, cam in zip(views, depths, masks, intrinsics, cameras):
+    window = np.ones((2 * CONSISTENCY_SLACK_PX + 1,) * 2, np.uint8)
+    for j, depth, k, cam in zip(views, depths, intrinsics, cameras):
         other = np.flatnonzero(owner != j)
-        h, w = mask.shape
-        radius = max(1, round(CONSISTENCY_MASK_DILATION * np.hypot(h, w)))
-        dilated = cv2.dilate(mask.astype(np.uint8), np.ones((2 * radius + 1,) * 2, np.uint8))
+        h, w = depth.shape
         in_camera = points[other] @ cam[:3, :3].T + cam[:3, 3]
         u, v, inside = project(in_camera, k, w, h)
         z = in_camera[:, 2]
         measured = np.zeros(len(other))
         measured[inside] = depth[v[inside], u[inside]]
-        background = np.zeros(len(other), dtype=bool)
-        background[inside] = dilated[v[inside], u[inside]] == 0
-        known = measured > 0
-        support[other] += known & (np.abs(z - measured) <= CONSISTENCY_TOLERANCE * measured)
-        conflict[other] += background | (known & (z < measured * (1 - CONSISTENCY_TOLERANCE)))
+        # seen through only when every depth around the pixel lies beyond the point
+        nearest = cv2.erode(np.where(depth > 0, depth, np.inf).astype(np.float32), window)
+        closest = np.full(len(other), np.inf)
+        closest[inside] = nearest[v[inside], u[inside]]
+        support[other] += (measured > 0) & (
+            np.abs(z - measured) <= CONSISTENCY_TOLERANCE * measured
+        )
+        conflict[other] += np.isfinite(closest) & (z < closest * (1 - CONSISTENCY_TOLERANCE))
     return conflict <= support
 
 
