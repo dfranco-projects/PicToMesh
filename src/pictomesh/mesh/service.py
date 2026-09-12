@@ -68,7 +68,10 @@ class MeshService:
         """
         out = path.with_suffix(f".{fmt}")
         out.parent.mkdir(parents=True, exist_ok=True)
-        mesh.export(str(out))
+        if fmt == "glb":
+            mesh.export(str(out), include_normals=True)  # viewers shade normal-less glTF flat
+        else:
+            mesh.export(str(out))
         return out
 
     # ── private ──────────────────────────────────────────────────────────────
